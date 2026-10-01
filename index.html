@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>シフト作成</title>
+<style>
+:root{--bg:#f3f5fb;--fg:#1f2937;--card:#ffffff;--ac:#4f46e5;--ac2:#0ea5e9;--bd:#e2e6f0;--mut:#6b7280;--bub:#d4f4c8;--bubfg:#14301a;--shadow:0 1px 3px rgba(30,41,90,.10);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f172a;--fg:#e8ecf5;--card:#1b2437;--ac:#818cf8;--ac2:#38bdf8;--bd:#2e3a52;--mut:#94a3b8;--bub:#1f5130;--bubfg:#e6f7e9;--shadow:0 1px 3px rgba(0,0,0,.4)}}
+:root[data-theme="dark"]{--bg:#0f172a;--fg:#e8ecf5;--card:#1b2437;--ac:#818cf8;--ac2:#38bdf8;--bd:#2e3a52;--mut:#94a3b8;--bub:#1f5130;--bubfg:#e6f7e9;--shadow:0 1px 3px rgba(0,0,0,.4)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0 auto;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,"Hiragino Sans","Noto Sans JP",sans-serif;padding:12px 12px 40px;max-width:640px}
+header{display:flex;align-items:baseline;gap:10px;margin:0 0 14px;padding:16px 18px;border-radius:18px;color:#fff;background:linear-gradient(135deg,var(--ac),var(--ac2));box-shadow:0 4px 14px rgba(79,70,229,.25)}
+header h1{margin:0;font-size:21px;letter-spacing:.04em}header span{font-size:14px;opacity:.9;background:rgba(255,255,255,.22);padding:1px 10px;border-radius:12px}
+input,select,button,textarea{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:8px 10px;min-width:0}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--ac);outline-offset:0}
+button{background:linear-gradient(135deg,var(--ac),var(--ac2));color:#fff;border:0;font-weight:600;padding:8px 14px;cursor:pointer;box-shadow:var(--shadow)}
+button:active{transform:scale(.96)}
+#rst,button[data-res],[data-ovr]{background:transparent;color:var(--ac);border:1px solid var(--ac);box-shadow:none}
+button[data-del]{background:#ef4444!important;padding:6px 11px}
+#d{font-weight:700;font-size:18px}
+.row{display:flex;gap:6px;margin:6px 0;align-items:center;flex-wrap:wrap}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:10px 12px;margin:8px 0;box-shadow:var(--shadow)}
+#rows .card{border-left:5px solid var(--ac2)}#rows .card.emp{border-left-color:#f59e0b}
+#rows .card .row{margin:4px 0}
+.p{flex:1 1 60px;width:60px}.t{width:64px}.n{flex:1 1 90px;width:90px}
+#pos>div{padding:3px 0;border-bottom:1px dashed var(--bd)}#pos>div:last-child{border-bottom:0}
+#pos input[type=number]{background:var(--card)}
+details{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:10px 14px;margin:8px 0;box-shadow:var(--shadow)}
+summary{cursor:pointer;font-weight:600;color:var(--ac)}
+pre{background:var(--bub);color:var(--bubfg);padding:14px 16px;border-radius:18px 18px 4px 18px;white-space:pre-wrap;overflow-x:auto;font:15px/1.6 ui-monospace,"Noto Sans Mono CJK JP",Menlo,monospace;box-shadow:var(--shadow)}
+h3{margin:24px 0 4px;font-size:15px;display:flex;align-items:center;gap:8px}
+h3::before{content:"";width:5px;height:17px;border-radius:3px;background:linear-gradient(var(--ac),var(--ac2))}
+small{color:var(--mut)}
+label{display:inline-flex;align-items:center;gap:4px}
+.chip{padding:4px 12px;font-size:14px;border-radius:16px}
+.chip.on{background:var(--ac);color:#fff;border:0}
+.chip.off{background:transparent;color:var(--fg);border:1px solid var(--bd);box-shadow:none;font-weight:400}
+
+main{display:none}main.on{display:block}
+body{padding-bottom:96px}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--bd);padding:6px 4px;padding-bottom:calc(6px + env(safe-area-inset-bottom,0px));box-shadow:0 -2px 10px rgba(30,41,90,.08);z-index:9}
+#nav button{flex:1;background:none;color:var(--mut);box-shadow:none;border-radius:10px;font-size:11px;font-weight:600;padding:4px 2px;display:flex;flex-direction:column;align-items:center;gap:2px;line-height:1.2}
+#nav button b{font-size:20px;font-weight:400}#nav button.on{color:var(--ac);background:var(--bg)}
+.ghost{background:transparent!important;color:var(--ac);border:1px solid var(--ac);box-shadow:none}
+.del{background:#ef4444!important;padding:6px 11px}
+</style></head>
+<body>
+<header><h1 id="ttl">シフト作成</h1><span id="sn"></span></header>
+<main id="v1" class="on">
+<div class="row"><select id="st" style="flex:1"></select></div>
+<div class="row"><input type="file" id="f" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"><select id="sh" style="display:none"></select><small id="msg">Excelを読み込んでください</small></div>
+<div class="row"><select id="d" style="flex:1"></select><label><input type="checkbox" id="hol"> 祝日</label><button id="rst">Excelに戻す</button></div>
+<h3>人員</h3><div id="rows"></div>
+<div class="row"><button id="add">＋ 追加</button></div>
+<h3>定数・評価</h3><div id="pos" class="card"></div>
+<h3>削除した人</h3><div id="del"></div>
+<h3>当日入力</h3>
+<div class="row">予約 <input id="g" type="number" class="t" placeholder="組">組 <input id="pp" type="number" class="t" placeholder="名">名</div>
+<div class="row">売上目標 <input id="tg" type="number" style="flex:1" placeholder="円"></div>
+<div class="row">備考 <input id="nt" style="flex:1" placeholder="備考(任意)"></div>
+<h3>出力</h3><pre id="out"></pre>
+<div class="row"><button id="cp">コピー</button><small id="lb"></small></div>
+</main>
+<main id="v2"><h3>人件費累計</h3><div class="card"><small>準備中です</small></div></main>
+<main id="v3"></main>
+<main id="v4"><h3>その他</h3><div class="card"><small>準備中です</small></div></main>
+<nav id="nav"><button data-n="1" class="on"><b>📋</b>シフト作成</button><button data-n="2"><b>💴</b>人件費累計</button><button data-n="3"><b>⚙️</b>登録情報確認・編集</button><button data-n="4"><b>…</b>その他</button></nav>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const KEY="shift-s2",WD="日月火水木金土",$=i=>document.getElementById(i);
+const P=(n,role,parent,kw,wk,fs,sat)=>({n,role,parent,kw,wk,fs,sat});
+const SEED=()=>({id:1,name:"店舗1",wage:0,daily:0,dv:3,emps:[],pos:[],skill:{},days:{},cur:null});
+let S=null,WB,cur=null,armed=false;
+try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!S.stores)S={stores:[SEED()],cs:1};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const ST=()=>S.stores.find(x=>x.id===S.cs)||S.stores[0];
+const DY=()=>ST().days;
+const setCur=k=>{cur=k;ST().cur=k};
+const dtype=D=>D.wd==="土"?"sat":(D.hol||D.wd==="金"||D.wd==="日")?"fs":"wk";
+const kws=p=>[p.n,...String(p.kw||"").split(/[,、\s]+/)].filter(Boolean);
+const num=x=>String(+x);
+const wid=s=>[...s].reduce((a,c)=>a+(c.charCodeAt(0)>255?2:1),0);
+const pad=(s,w)=>s+" ".repeat(Math.max(w-wid(s),0));
+const prep=t=>(t||"").normalize("NFKC").replace(/(\d)[.,、・](\d)階/g,"$1階$2階");
+const setP=(o,path,v)=>{const k=path.split(".");let t=o;for(let i=0;i<k.length-1;i++)t=t[k[i]];t[k[k.length-1]]=v};
+function avail(T,t){return T.pos.filter(p=>p[t]!=null&&!(p.role==="parent"&&T.pos.some(c=>c.role==="child"&&c.parent===p.n&&c[t]!=null)))}
+function ensure(r){if(r.ps)return;const T=ST(),t=prep(r.p),f=[];
+  T.pos.forEach(p=>{const ix=Math.min(...kws(p).map(k=>{const j=t.indexOf(k);return j<0?1e9:j}));if(ix<1e9)f.push([ix,p.n])});
+  f.sort((a,b)=>a[0]-b[0]);r.ps=f.map(x=>x[1]);r.x=r.ps.length?"":(r.p||"")}
+const posTxt=r=>{ensure(r);return[r.ps.join("・"),r.x].filter(Boolean).join(" ")};
+function rate(n,p,dv){const d=ST().skill[n]||{};for(const k of [...kws(p),p.parent])if(k&&d[k]!==undefined)return +d[k];return dv}
+function posSel(r,i){ensure(r);return `<div class="row" style="width:100%">`+avail(ST(),dtype(DY()[cur])).map(p=>{const k=r.ps.indexOf(p.n);
+  return `<button class="chip ${k>=0?"on":"off"}" data-i="${i}" data-c="${p.n}">${p.n}${k>=0&&r.ps.length>1?"①②③④⑥⑦"[k]:""}</button>`}).join("")+
+  `<input style="flex:1 1 90px" placeholder="その他" value="${r.x}" data-i="${i}" data-k="x"></div>`}
+function board(rows,D){
+  const T=ST(),t=dtype(D),names=avail(T,t).map(p=>p.n),G=n=>T.pos.find(p=>p.n===n),dv=+T.dv||3,we=t!=="wk";
+  const sc={},cn={},ppl={},rc={};let free=0;
+  rows.forEach(r=>{ensure(r);const ps=r.ps.filter(n=>names.includes(n)),core=ps.filter(n=>["normal","child","parent"].includes(G(n).role));
+    ps.forEach(n=>{const q=G(n);if(q.role==="reg")rc[n]=(rc[n]||0)+1;if(q.role==="free")free++});
+    core.forEach((n,i)=>{const b=rate(r.n,G(n),dv),m=rate(r.n,G(core[0]),dv),v=core.length<2?b:(we?(i?b+1:b-1):m-1),q=G(n);
+      sc[n]=(sc[n]||0)+v;cn[n]=(cn[n]||0)+1;if(q.role==="child")(ppl[q.parent]=ppl[q.parent]||new Set()).add(r)})});
+  const ov=D.ov||{},man={},auto={},kids=p=>T.pos.filter(c=>c.role==="child"&&c.parent===p.n&&c[t]!=null),
+    top=T.pos.filter(p=>(p.role==="normal"||p.role==="parent")&&p[t]!=null),ovr=p=>{if(ov[p.n]!==undefined){auto[p.n]=sc[p.n]||0;sc[p.n]=ov[p.n];man[p.n]=1}};
+  T.pos.filter(p=>p.role==="child"&&p[t]!=null).forEach(ovr);
+  top.forEach(p=>{const k=kids(p);if(p.role==="parent"&&k.length){sc[p.n]=k.reduce((x,c)=>x+(sc[c.n]||0),0);cn[p.n]=(ppl[p.n]||new Set()).size}});
+  T.pos.filter(p=>p.role==="reg"&&p[t]!=null&&p.parent).forEach(p=>sc[p.parent]=(sc[p.parent]||0)+(rc[p.n]||0));
+  top.forEach(p=>sc[p.n]=(sc[p.n]||0)+free);top.forEach(ovr);
+  const line=(lb,v,st,ex,ind,key)=>{const bad=st>0&&v<st,m=man[key];
+    return `<div style="${ind?"margin-left:1.2em;":""}color:${bad?"#dc2626":"inherit"}">${bad?"⚠":""}${lb} 評価 <input type="number" step="0.5" data-ov="${key}" value="${+v.toFixed(1)}" style="width:62px;padding:2px 4px;${m?"border:2px solid #f59e0b;background:#fef3c7;color:#111":""}">${st>0?" / "+st:""}${ex||""}${m?` <small style="color:#d97706">✎手入力(自動 ${+auto[key].toFixed(1)})</small> <button class="chip ghost" data-ovr="${key}">戻す</button>`:""}</div>`};
+  let h="",tot=0,ts=0;
+  top.forEach(p=>{tot+=sc[p.n]||0;ts+=p[t]||0;h+=line(p.n,sc[p.n]||0,p[t],` (${cn[p.n]||0}人)`,0,p.n);
+    if(p.role==="parent")kids(p).forEach(c=>h+=line(c.n,sc[c.n]||0,c[t],` (${cn[c.n]||0}人)`,1,c.n))});
+  T.pos.filter(p=>(p.role==="reg"||p.role==="free")&&p[t]!=null).forEach(p=>{const c=p.role==="reg"?rc[p.n]||0:free,bad=p[t]>0&&c<p[t];
+    h+=`<div style="color:${bad?"#dc2626":"inherit"}">${bad?"⚠":""}${p.n} ${c}人${p[t]>0?" / "+p[t]:""}</div>`});
+  h+=`<div><b>合計評価 ${+tot.toFixed(1)} / ${ts}${Object.keys(man).length?" ✎手入力あり":""}</b></div>`;
+  const oth=rows.filter(r=>r.x);if(oth.length)h+=`<div><small>その他: ${oth.map(r=>r.n+"("+r.x+")").join("、")}</small></div>`;
+  return h}
+function load(buf){WB=XLSX.read(buf,{type:"array",cellDates:true});
+  const sh=$("sh"),N=WB.SheetNames;sh.innerHTML=N.map(n=>`<option>${n}</option>`).join("");sh.value=N[N.length-1];sh.style.display=N.length>1?"":"none";parse()}
+function parse(){const ws=WB.Sheets[$("sh").value],a=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null}),days={};
+  (a[0]||[]).forEach((v,c)=>{if(!(v instanceof Date))return;
+    const d=new Date(v.getTime()+12*36e5),k=(d.getUTCMonth()+1)+"/"+d.getUTCDate(),rows=[];
+    for(let r=8;r<a.length;r++){const n=a[r][1],s=a[r][c],e=a[r][c+1];
+      if(!n||n==="ホール"||n==="キッチン"||typeof s!=="number"||typeof e!=="number")continue;rows.push({n:String(n).trim(),s,e,ps:[],x:""})}
+    rows.sort((x,y)=>x.s-y.s);const tg=parseInt(String(a[2]&&a[2][c]||"").replace(/,/g,""))||"";
+    days[k]={wd:WD[d.getUTCDay()],rows,g:"",pp:"",tg,nt:"",orig:JSON.stringify({rows,tg})}});
+  if(!Object.keys(days).length){$("msg").textContent="「"+$("sh").value+"」に日付の行が見つかりません";return}
+  ST().days=days;setCur(Object.keys(days)[0]);save();init();$("msg").textContent=$("sh").value+": "+Object.keys(days).length+"日分を読み込みました"}
+function fillStores(){const o=S.stores.map(s=>`<option value="${s.id}" ${s.id===S.cs?"selected":""}>${s.name}</option>`).join("");
+  $("st").innerHTML=o;if($("rs"))$("rs").innerHTML=o;$("sn").textContent=ST().name}
+function switchStore(id){S.cs=id;cur=ST().cur;save();fillStores();init();renderReg()}
+function init(){const k=Object.keys(DY());if(!cur||!DY()[cur])setCur(k[0]||null);
+  $("d").innerHTML=k.map(x=>`<option ${x===cur?"selected":""}>${x}</option>`).join("");draw()}
+function draw(){const T=ST(),D=DY()[cur];
+  if(!D){["rows","pos","del"].forEach(i=>$(i).innerHTML="");$("out").textContent="";$("lb").textContent="";return}
+  $("rows").innerHTML=D.rows.map((r,i)=>`<div class="card ${T.emps.some(e=>e.n===r.n)?"emp":""}"><div class="row">
+  <input class="n" value="${r.n}" data-i="${i}" data-k="n">
+  <input class="t" type="number" step="0.5" value="${r.s}" data-i="${i}" data-k="s">〜
+  <input class="t" type="number" step="0.5" value="${r.e}" data-i="${i}" data-k="e">
+  <button data-del="${i}" style="background:#ef4444">×</button></div>${posSel(r,i)}</div>`).join("");
+  D.del=D.del||[];$("hol").checked=!!D.hol;
+  $("del").innerHTML=D.del.map((r,i)=>`<div class="card row">${r.n} ${r.s}-${r.e} ${posTxt(r)} <button data-res="${i}">戻す</button></div>`).join("")||"<small>なし</small>";
+  $("g").value=D.g;$("pp").value=D.pp;$("tg").value=D.tg;$("nt").value=D.nt;out()}
+function out(){const T=ST(),D=DY()[cur];if(!D)return;
+  const rows=[...D.rows].sort((x,y)=>x.s-y.s),nw=Math.max(8,...rows.map(r=>wid(r.n)))+2,wage=+T.wage||0;
+  let h=0,labor=+T.daily||0;const L=[`${cur}(${D.wd})  ${T.name}`];
+  rows.forEach(r=>{const w=r.e-r.s,e=T.emps.find(x=>x.n===r.n);if(e)labor+=+e.v;else{h+=w;labor+=w*wage}
+    L.push((pad(r.n,nw)+pad(num(r.s)+"-"+num(r.e),12)+posTxt(r)).trimEnd())});
+  const m=[];if(D.g||D.pp)m.push(`${D.g||0}組${D.pp||0}名`);
+  m.push(num(h)+"H");if(D.tg)m.push(num(+(D.tg/1e4).toFixed(1))+"万");
+  L.push(m.join("  "));
+  const t=[];if(D.tg)t.push(Math.round(labor/D.tg*100)+"%");if(D.nt)t.push(D.nt);
+  if(t.length)L.push(t.join("   "));
+  $("out").textContent=L.join("\n");$("pos").innerHTML=board(rows,D);
+  $("lb").textContent="人件費 "+Math.round(labor).toLocaleString()+"円"}
+function renderReg(){const T=ST(),pn=T.pos.filter(p=>p.role==="parent").map(p=>p.n),
+  inp=(b,v,ty,ex)=>`<input data-b="${b}" ${ty?`data-t="${ty}"`:""} value="${v==null?"":String(v).replace(/"/g,"&quot;")}" ${ex||""}>`,
+  roles={normal:"通常",parent:"親(子の合計)",child:"子",reg:"レジ型(人数のみ・親に+1)",free:"フリー型(人数のみ・全体に+1)"};
+  $("v3").innerHTML=`<h3>店舗</h3><div class="card"><div class="row"><select id="rs" style="flex:1">${S.stores.map(s=>`<option value="${s.id}" ${s.id===T.id?"selected":""}>${s.name}</option>`).join("")}</select><button data-a="addst">＋複製して追加</button></div>
+  <div class="row">店舗名 ${inp("name",T.name,"","style='flex:1'")}</div>
+  <div class="row">時給 ${inp("wage",T.wage,"n","type=number style='width:90px'")}円 毎日の固定人件費 ${inp("daily",T.daily,"n","type=number style='width:90px'")}円</div>
+  <div class="row"><button data-a="delst" class="ghost" ${S.stores.length<2?"disabled":""}>${armed?"本当に削除する":"この店舗を削除"}</button></div></div>
+  <h3>社員(シフトインした日に発生)</h3><div class="card">${T.emps.map((e,i)=>`<div class="row">${inp(`emps.${i}.n`,e.n,"","style='flex:1' placeholder='名前'")}${inp(`emps.${i}.v`,e.v,"n","type=number style='width:90px'")}円<button data-a="delemp" data-i="${i}" class="del">×</button></div>`).join("")}<button data-a="addemp">＋社員追加</button></div>
+  <h3>ポジション・定数</h3><small>基準は 平日(月〜木)/金・日・祝/土 ごと。空欄=その日は使わない、0=基準なしで使う</small>
+  ${T.pos.map((p,i)=>`<div class="card"><div class="row">${inp(`pos.${i}.n`,p.n,"","style='flex:1' placeholder='名前'")}<button data-a="up" data-i="${i}" class="ghost">↑</button><button data-a="delpos" data-i="${i}" class="del">×</button></div>
+  <div class="row"><select data-b="pos.${i}.role" data-rr="1">${Object.entries(roles).map(([k,l])=>`<option value="${k}" ${p.role===k?"selected":""}>${l}</option>`).join("")}</select>
+  <select data-b="pos.${i}.parent"><option value="">親なし</option>${pn.map(n=>`<option ${p.parent===n?"selected":""}>${n}</option>`).join("")}</select></div>
+  <div class="row">平日${inp(`pos.${i}.wk`,p.wk,"z","type=number class=t")}金日祝${inp(`pos.${i}.fs`,p.fs,"z","type=number class=t")}土${inp(`pos.${i}.sat`,p.sat,"z","type=number class=t")}</div>
+  <div class="row">判定語 ${inp(`pos.${i}.kw`,p.kw,"","style='flex:1' placeholder='略称などをカンマ区切りで'")}</div></div>`).join("")}
+  <button data-a="addpos">＋ポジション追加</button>
+  <h3>評価辞書(5段階)</h3><div class="card"><textarea id="sk" rows="7" style="width:100%" placeholder='形式: {"名前":{"ポジション名":点数, ...}, ...}'>${Object.keys(T.skill).length?JSON.stringify(T.skill,null,1):""}</textarea>
+  <div class="row"><button data-a="sksave">保存</button>未評価の既定値 ${inp("dv",T.dv,"n","type=number class=t")}<small id="skmsg"></small></div></div>`}
+$("v3").oninput=e=>{const t=e.target,b=t.dataset.b;if(!b)return;let v=t.value;if(t.dataset.t==="n")v=+v||0;if(t.dataset.t==="z")v=v===""?null:+v;
+  setP(ST(),b,v);save();if(b==="name")fillStores()};
+$("v3").onchange=e=>{if(e.target.dataset.rr)renderReg();if(e.target.id==="rs")switchStore(+e.target.value)};
+$("v3").onclick=e=>{const d=e.target.dataset,a=d.a,T=ST();if(!a)return;if(a!=="delst")armed=false;
+  if(a==="addst"){const n=JSON.parse(JSON.stringify(T));n.id=Date.now();n.name=T.name+"(コピー)";n.days={};n.skill={};n.cur=null;S.stores.push(n);switchStore(n.id);return}
+  if(a==="delst"){if(S.stores.length<2)return;if(!armed){armed=true;renderReg();return}armed=false;S.stores=S.stores.filter(s=>s.id!==T.id);switchStore(S.stores[0].id);return}
+  if(a==="sksave"){try{const o=JSON.parse($("sk").value||"{}");if(typeof o!=="object"||Array.isArray(o))throw 0;T.skill=o;save();$("skmsg").textContent="保存しました"}catch(x){$("skmsg").textContent="JSON形式が不正です"}return}
+  if(a==="addemp")T.emps.push({n:"",v:0});if(a==="delemp")T.emps.splice(+d.i,1);
+  if(a==="addpos")T.pos.push(P("","normal","","",null,null,null));if(a==="delpos")T.pos.splice(+d.i,1);
+  if(a==="up"&&+d.i>0){const i=+d.i;[T.pos[i-1],T.pos[i]]=[T.pos[i],T.pos[i-1]]}
+  save();renderReg()};
+$("nav").onclick=e=>{const b=e.target.closest("button");if(!b)return;const n=b.dataset.n;
+  [1,2,3,4].forEach(i=>{$("v"+i).classList.toggle("on",i==n)});[...$("nav").children].forEach(x=>x.classList.toggle("on",x===b));
+  $("ttl").textContent=b.lastChild.textContent;if(n==3)renderReg();if(n==1)draw();window.scrollTo(0,0)};
+$("f").onchange=async e=>{const f=e.target.files[0];if(!f)return;
+  if(typeof XLSX==="undefined"){$("msg").textContent="Excel読込ライブラリを取得できていません。ネット接続とブラウザを確認してください";return}
+  try{load(await f.arrayBuffer())}catch(x){$("msg").textContent="読み込みに失敗しました: "+x.message}};
+$("sh").onchange=parse;$("st").onchange=e=>switchStore(+e.target.value);
+$("d").onchange=e=>{setCur(e.target.value);draw()};
+$("rows").oninput=e=>{const t=e.target,k=t.dataset.k;if(!k)return;const r=DY()[cur].rows[t.dataset.i];
+  r[k]=["s","e"].includes(k)?parseFloat(t.value)||0:t.value;save();out()};
+$("rows").onclick=e=>{const d=e.target.dataset,D=DY()[cur];
+  if(d.del!=null){D.del=D.del||[];D.del.push(...D.rows.splice(d.del,1));save();draw()}
+  if(d.c){const r=D.rows[d.i];ensure(r);const k=r.ps.indexOf(d.c);if(k>=0)r.ps.splice(k,1);else r.ps.push(d.c);save();draw()}};
+$("del").onclick=e=>{const i=e.target.dataset.res,D=DY()[cur];if(i!=null){D.rows.push(...D.del.splice(i,1));save();draw()}};
+$("pos").onchange=e=>{const k=e.target.dataset.ov;if(k===undefined)return;const D=DY()[cur];D.ov=D.ov||{};const v=parseFloat(e.target.value);if(isNaN(v))delete D.ov[k];else D.ov[k]=v;save();out()};
+$("pos").onclick=e=>{const k=e.target.dataset.ovr;if(k===undefined)return;delete DY()[cur].ov[k];save();out()};
+$("add").onclick=()=>{const D=DY()[cur];if(!D)return;D.rows.push({n:"",s:17,e:22,ps:[],x:""});save();draw()};
+[["g","g"],["pp","pp"],["tg","tg"],["nt","nt"]].forEach(([i,k])=>$(i).oninput=e=>{const D=DY()[cur];if(!D)return;
+  D[k]=k==="nt"?e.target.value:(e.target.value===""?"":+e.target.value);save();out()});
+$("hol").onchange=e=>{const D=DY()[cur];if(!D)return;D.hol=e.target.checked;save();draw()};
+$("rst").onclick=()=>{const D=DY()[cur];if(!D||!D.orig)return;const o=JSON.parse(D.orig);D.rows=o.rows;D.tg=o.tg;D.del=[];D.ov={};save();draw()};
+$("cp").onclick=()=>navigator.clipboard.writeText($("out").textContent).then(()=>$("cp").textContent="コピーしました");
+cur=ST().cur;fillStores();init();renderReg();
+if(typeof XLSX==="undefined")$("msg").textContent="Excel読込ライブラリを取得できていません(ネット接続を確認)";
+</script></body></html>
