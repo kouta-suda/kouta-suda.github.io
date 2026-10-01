@@ -2,6 +2,13 @@
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>シフト作成</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#4f46e5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="シフト">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <script>
 const AUTH_KEY="shift-auth",AUTH_MS=3600000;let EXP=0;
 const okSession=()=>{let t=0;try{t=+localStorage.getItem(AUTH_KEY)||0}catch(e){}return Math.max(t,EXP)>Date.now()};
@@ -51,10 +58,11 @@ nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);b
 #gate{display:none;position:fixed;inset:0;z-index:99;background:var(--bg);align-items:center;justify-content:center;padding:24px;padding-top:calc(24px + env(safe-area-inset-top,0px))}
 html.locked #gate{display:flex}
 html.locked body>*:not(#gate){display:none!important}
-.gbox{width:100%;max-width:340px;text-align:center}
+.gbox{width:100%;max-width:300px;text-align:center}
 .gbox h2{margin:0 0 6px}.gbox p{margin:0 0 18px;color:var(--mut)}
-#pin{display:block;width:100%;margin:0 auto 14px;font-size:30px;letter-spacing:.5em;text-align:center;padding:12px 8px 12px 20px}
-#pinbtn{width:100%;padding:12px;font-size:17px}
+#pin,#pinbtn{display:block;box-sizing:border-box;width:100%;max-width:200px;margin:0 auto}
+#pin{margin-bottom:14px;font-size:24px;letter-spacing:.4em;text-align:center;padding:9px 0 9px .4em}
+#pinbtn{padding:10px;font-size:16px}
 #pinmsg{display:block;margin-top:12px;min-height:1.4em;color:#dc2626}
 </style></head>
 <body>
@@ -82,11 +90,12 @@ html.locked body>*:not(#gate){display:none!important}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const KEY="shift-s2",WD="日月火水木金土",$=i=>document.getElementById(i);
-const P=(n,role,parent,kw,wk,fs,sat)=>({n,role,parent,kw,wk,fs,sat});
+const P=(n,role,parent,kw,wk,fs,sat,ab)=>({n,role,parent,kw,wk,fs,sat,ab});
 const SEED=()=>({id:1,name:"店舗1",wage:0,daily:0,dv:3,emps:[],pos:[],skill:{},days:{},cur:null});
 let S=null,WB,cur=null,armed=false;
 try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 if(!S||!S.stores)S={stores:[SEED()],cs:1};
+S.stores.forEach(T=>T.pos.forEach(p=>{if(p.ab===undefined)p.ab=p.n==="ホール"?"ホ":""}));
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const ST=()=>S.stores.find(x=>x.id===S.cs)||S.stores[0];
 const DY=()=>ST().days;
@@ -102,7 +111,8 @@ function avail(T,t){return T.pos.filter(p=>p[t]!=null&&!(p.role==="parent"&&T.po
 function ensure(r){if(r.ps)return;const T=ST(),t=prep(r.p),f=[];
   T.pos.forEach(p=>{const ix=Math.min(...kws(p).map(k=>{const j=t.indexOf(k);return j<0?1e9:j}));if(ix<1e9)f.push([ix,p.n])});
   f.sort((a,b)=>a[0]-b[0]);r.ps=f.map(x=>x[1]);r.x=r.ps.length?"":(r.p||"")}
-const posTxt=r=>{ensure(r);return[r.ps.join("・"),r.x].filter(Boolean).join(" ")};
+const posTxt=r=>{ensure(r);const ab=n=>{const q=ST().pos.find(p=>p.n===n);return q?(q.ab!==undefined?q.ab:(n==="ホール"?"ホ":""))||n:n};
+  return[r.ps.length>1?r.ps.map(ab).join(""):r.ps.join(""),r.x].filter(Boolean).join(" ")};
 function rate(n,p,dv){const d=ST().skill[n]||{};for(const k of [...kws(p),p.parent])if(k&&d[k]!==undefined)return +d[k];return dv}
 function posSel(r,i){ensure(r);return `<div class="row" style="width:100%">`+avail(ST(),dtype(DY()[cur])).map(p=>{const k=r.ps.indexOf(p.n);
   return `<button class="chip ${k>=0?"on":"off"}" data-i="${i}" data-c="${p.n}">${p.n}${k>=0&&r.ps.length>1?"①②③④⑥⑦"[k]:""}</button>`}).join("")+
@@ -181,6 +191,7 @@ function renderReg(){const T=ST(),pn=T.pos.filter(p=>p.role==="parent").map(p=>p
   <div class="row"><select data-b="pos.${i}.role" data-rr="1">${Object.entries(roles).map(([k,l])=>`<option value="${k}" ${p.role===k?"selected":""}>${l}</option>`).join("")}</select>
   <select data-b="pos.${i}.parent"><option value="">親なし</option>${pn.map(n=>`<option ${p.parent===n?"selected":""}>${n}</option>`).join("")}</select></div>
   <div class="row">平日${inp(`pos.${i}.wk`,p.wk,"z","type=number class=t")}金日祝${inp(`pos.${i}.fs`,p.fs,"z","type=number class=t")}土${inp(`pos.${i}.sat`,p.sat,"z","type=number class=t")}</div>
+  <div class="row">複数担当時の略称 ${inp(`pos.${i}.ab`,p.ab,"","style='flex:1' placeholder='空欄=そのまま'")}</div>
   <div class="row">判定語 ${inp(`pos.${i}.kw`,p.kw,"","style='flex:1' placeholder='略称などをカンマ区切りで'")}</div></div>`).join("")}
   <button data-a="addpos">＋ポジション追加</button>
   <h3>評価辞書(5段階)</h3><div class="card"><textarea id="sk" rows="7" style="width:100%" placeholder='形式: {"名前":{"ポジション名":点数, ...}, ...}'>${Object.keys(T.skill).length?JSON.stringify(T.skill,null,1):""}</textarea>
@@ -235,4 +246,5 @@ const watch=()=>{if(!okSession()&&!root.classList.contains("locked"))lock()};
 setInterval(watch,15000);document.addEventListener("visibilitychange",watch);
 if(root.classList.contains("locked"))$("pin").focus();
 })();
-</script></body></html>
+</script>
+<script>if("serviceWorker" in navigator&&location.protocol.indexOf("http")===0)navigator.serviceWorker.register("sw.js").catch(()=>{});</script></body></html>
