@@ -1,7 +1,7 @@
 {
  "name": "シフト作成",
  "short_name": "シフト",
- "start_url": "./shift_app.html",
+ "start_url": "./index.html",
  "scope": "./",
  "display": "standalone",
  "background_color": "#f3f5fb",
