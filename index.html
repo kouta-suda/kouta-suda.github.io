@@ -2,6 +2,11 @@
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>シフト作成</title>
+<script>
+const AUTH_KEY="shift-auth",AUTH_MS=3600000;let EXP=0;
+const okSession=()=>{let t=0;try{t=+localStorage.getItem(AUTH_KEY)||0}catch(e){}return Math.max(t,EXP)>Date.now()};
+if(!okSession())document.documentElement.classList.add("locked");
+</script>
 <style>
 :root{--bg:#f3f5fb;--fg:#1f2937;--card:#ffffff;--ac:#4f46e5;--ac2:#0ea5e9;--bd:#e2e6f0;--mut:#6b7280;--bub:#d4f4c8;--bubfg:#14301a;--shadow:0 1px 3px rgba(30,41,90,.10);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f172a;--fg:#e8ecf5;--card:#1b2437;--ac:#818cf8;--ac2:#38bdf8;--bd:#2e3a52;--mut:#94a3b8;--bub:#1f5130;--bubfg:#e6f7e9;--shadow:0 1px 3px rgba(0,0,0,.4)}}
@@ -42,8 +47,18 @@ nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);b
 #nav button b{font-size:20px;font-weight:400}#nav button.on{color:var(--ac);background:var(--bg)}
 .ghost{background:transparent!important;color:var(--ac);border:1px solid var(--ac);box-shadow:none}
 .del{background:#ef4444!important;padding:6px 11px}
+
+#gate{display:none;position:fixed;inset:0;z-index:99;background:var(--bg);align-items:center;justify-content:center;padding:24px;padding-top:calc(24px + env(safe-area-inset-top,0px))}
+html.locked #gate{display:flex}
+html.locked body>*:not(#gate){display:none!important}
+.gbox{width:100%;max-width:340px;text-align:center}
+.gbox h2{margin:0 0 6px}.gbox p{margin:0 0 18px;color:var(--mut)}
+#pin{display:block;width:100%;margin:0 auto 14px;font-size:30px;letter-spacing:.5em;text-align:center;padding:12px 8px 12px 20px}
+#pinbtn{width:100%;padding:12px;font-size:17px}
+#pinmsg{display:block;margin-top:12px;min-height:1.4em;color:#dc2626}
 </style></head>
 <body>
+<div id="gate"><div class="gbox"><h2>シフト作成</h2><p>4桁の番号を入力してください</p><input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" aria-label="4桁の番号"><button id="pinbtn">開く</button><small id="pinmsg"></small></div></div>
 <header><h1 id="ttl">シフト作成</h1><span id="sn"></span></header>
 <main id="v1" class="on">
 <div class="row"><select id="st" style="flex:1"></select></div>
@@ -205,4 +220,19 @@ $("rst").onclick=()=>{const D=DY()[cur];if(!D||!D.orig)return;const o=JSON.parse
 $("cp").onclick=()=>navigator.clipboard.writeText($("out").textContent).then(()=>$("cp").textContent="コピーしました");
 cur=ST().cur;fillStores();init();renderReg();
 if(typeof XLSX==="undefined")$("msg").textContent="Excel読込ライブラリを取得できていません(ネット接続を確認)";
+</script>
+<script>
+(function(){
+const H="nor2qwcos8",SALT="shift-gate",root=document.documentElement;let fails=0,until=0;
+const h=s=>{let a=0xdeadbeef,b=0x41c6ce57;for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);a=Math.imul(a^c,2654435761);b=Math.imul(b^c,1597334677)}a=Math.imul(a^(a>>>16),2246822507)^Math.imul(b^(b>>>13),3266489909);b=Math.imul(b^(b>>>16),2246822507)^Math.imul(a^(a>>>13),3266489909);return (4294967296*(2097151&b)+(a>>>0)).toString(36)};
+const msg=t=>$("pinmsg").textContent=t;
+function lock(){root.classList.add("locked");$("pin").value="";msg("");$("pin").focus()}
+function check(){if(Date.now()<until){msg("30秒ほど待ってから入力してください");return}
+  if(h(SALT+$("pin").value)===H){fails=0;EXP=Date.now()+AUTH_MS;try{localStorage.setItem(AUTH_KEY,String(EXP))}catch(e){}root.classList.remove("locked");$("pin").value="";msg("")}
+  else{fails++;$("pin").value="";if(fails>=5){until=Date.now()+30000;fails=0;msg("5回間違えました。30秒ほど待ってください")}else msg("番号が違います")}}
+$("pinbtn").onclick=check;$("pin").onkeydown=e=>{if(e.key==="Enter")check()};
+const watch=()=>{if(!okSession()&&!root.classList.contains("locked"))lock()};
+setInterval(watch,15000);document.addEventListener("visibilitychange",watch);
+if(root.classList.contains("locked"))$("pin").focus();
+})();
 </script></body></html>
