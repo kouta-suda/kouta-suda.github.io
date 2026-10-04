@@ -70,7 +70,10 @@ html.locked body>*:not(#gate){display:none!important}
 <header><h1 id="ttl">シフト作成</h1><span id="sn"></span></header>
 <main id="v1" class="on">
 <div class="row"><select id="st" style="flex:1"></select></div>
-<div class="row"><input type="file" id="f" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"><select id="sh" style="display:none"></select><small id="msg">Excelを読み込んでください</small></div>
+<div class="row"><select id="mm"></select><select id="hf"><option>前半</option><option>後半</option></select><button id="od">OneDriveから読み込む</button></div>
+<div class="row"><input type="file" id="f" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
+<div class="row"><select id="sh" style="display:none;flex:1"></select></div>
+<div class="row"><small id="msg">月と前半・後半を選んで、Excelを読み込んでください</small></div>
 <div class="row"><select id="d" style="flex:1"></select><label><input type="checkbox" id="hol"> 祝日</label><button id="rst">Excelに戻す</button></div>
 <h3>人員</h3><div id="rows"></div>
 <div class="row"><button id="add">＋ 追加</button></div>
@@ -140,8 +143,17 @@ function board(rows,D){
   h+=`<div><b>合計評価 ${+tot.toFixed(1)} / ${ts}${Object.keys(man).length?" ✎手入力あり":""}</b></div>`;
   const oth=rows.filter(r=>r.x);if(oth.length)h+=`<div><small>その他: ${oth.map(r=>r.n+"("+r.x+")").join("、")}</small></div>`;
   return h}
-function load(buf){WB=XLSX.read(buf,{type:"array",cellDates:true});
-  const sh=$("sh"),N=WB.SheetNames;sh.innerHTML=N.map(n=>`<option>${n}</option>`).join("");sh.value=N[N.length-1];sh.style.display=N.length>1?"":"none";parse()}
+const msg=t=>{$("msg").textContent=t};
+const nz=s=>(s||"").normalize("NFKC").replace(/\s+/g,"");
+function load(buf){WB=XLSX.read(buf,{type:"array",cellDates:true});pick()}
+function pick(){const N=WB.SheetNames,m=$("mm").value,hf=$("hf").value,sh=$("sh"),sn=nz(ST().name);
+  const c=N.filter(n=>new RegExp("(^|\\D)"+m+"月"+hf).test(nz(n)));
+  const mine=c.filter(n=>sn&&nz(n).includes(sn)),plain=c.filter(n=>new RegExp("^"+m+"月"+hf).test(nz(n)));
+  const use=mine.length?mine:plain;
+  sh.innerHTML=N.map(n=>`<option>${n}</option>`).join("");sh.style.display=N.length>1?"":"none";
+  if(use.length){sh.value=use[0];parse();if(use.length>1)msg($("msg").textContent+"(同じ名前に当てはまるシートが"+use.length+"枚あります。上の選択で切り替えられます)")}
+  else if(c.length){sh.value=c[0];msg("「"+m+"月"+hf+"」に当てはまるシートは、別の名前が付いたものだけでした("+c.join("、")+")。この店舗のシートか確認して、上の選択から選んでください")}
+  else{msg("「"+m+"月"+hf+"」に当てはまるシートがありません。上の選択から直接選べます")}}
 function parse(){const ws=WB.Sheets[$("sh").value],a=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null}),days={};
   (a[0]||[]).forEach((v,c)=>{if(!(v instanceof Date))return;
     const d=new Date(v.getTime()+12*36e5),k=(d.getUTCMonth()+1)+"/"+d.getUTCDate(),rows=[];
@@ -184,7 +196,10 @@ function renderReg(){const T=ST(),pn=T.pos.filter(p=>p.role==="parent").map(p=>p
   $("v3").innerHTML=`<h3>店舗</h3><div class="card"><div class="row"><select id="rs" style="flex:1">${S.stores.map(s=>`<option value="${s.id}" ${s.id===T.id?"selected":""}>${s.name}</option>`).join("")}</select><button data-a="addst">＋複製して追加</button></div>
   <div class="row">店舗名 ${inp("name",T.name,"","style='flex:1'")}</div>
   <div class="row">時給 ${inp("wage",T.wage,"n","type=number style='width:90px'")}円 毎日の固定人件費 ${inp("daily",T.daily,"n","type=number style='width:90px'")}円</div>
+  <div class="row">OneDriveのファイル ${inp("od",T.od,"","style='flex:1' placeholder='共有リンク、または /フォルダ/ファイル名.xlsx'")}</div>
   <div class="row"><button data-a="delst" class="ghost" ${S.stores.length<2?"disabled":""}>${armed?"本当に削除する":"この店舗を削除"}</button></div></div>
+  <h3>OneDrive連携(共通)</h3><div class="card"><div class="row">クライアントID <input data-g="cid" value="${S.cid||""}" style="flex:1" placeholder="Microsoftで発行したID" autocomplete="off"></div>
+  <small>登録時に指定するリダイレクトURI: ${redir()}</small><div class="row"><button data-a="odout" class="ghost">Microsoftからログアウト</button></div></div>
   <h3>社員(シフトインした日に発生)</h3><div class="card">${T.emps.map((e,i)=>`<div class="row">${inp(`emps.${i}.n`,e.n,"","style='flex:1' placeholder='名前'")}${inp(`emps.${i}.v`,e.v,"n","type=number style='width:90px'")}円<button data-a="delemp" data-i="${i}" class="del">×</button></div>`).join("")}<button data-a="addemp">＋社員追加</button></div>
   <h3>ポジション・定数</h3><small>基準は 平日(月〜木)/金・日・祝/土 ごと。空欄=その日は使わない、0=基準なしで使う</small>
   ${T.pos.map((p,i)=>`<div class="card"><div class="row">${inp(`pos.${i}.n`,p.n,"","style='flex:1' placeholder='名前'")}<button data-a="up" data-i="${i}" class="ghost">↑</button><button data-a="delpos" data-i="${i}" class="del">×</button></div>
@@ -195,14 +210,24 @@ function renderReg(){const T=ST(),pn=T.pos.filter(p=>p.role==="parent").map(p=>p
   <div class="row">判定語 ${inp(`pos.${i}.kw`,p.kw,"","style='flex:1' placeholder='略称などをカンマ区切りで'")}</div></div>`).join("")}
   <button data-a="addpos">＋ポジション追加</button>
   <h3>評価辞書(5段階)</h3><div class="card"><textarea id="sk" rows="7" style="width:100%" placeholder='形式: {"名前":{"ポジション名":点数, ...}, ...}'>${Object.keys(T.skill).length?JSON.stringify(T.skill,null,1):""}</textarea>
-  <div class="row"><button data-a="sksave">保存</button>未評価の既定値 ${inp("dv",T.dv,"n","type=number class=t")}<small id="skmsg"></small></div></div>`}
-$("v3").oninput=e=>{const t=e.target,b=t.dataset.b;if(!b)return;let v=t.value;if(t.dataset.t==="n")v=+v||0;if(t.dataset.t==="z")v=v===""?null:+v;
-  setP(ST(),b,v);save();if(b==="name")fillStores()};
-$("v3").onchange=e=>{if(e.target.dataset.rr)renderReg();if(e.target.id==="rs")switchStore(+e.target.value)};
-$("v3").onclick=e=>{const d=e.target.dataset,a=d.a,T=ST();if(!a)return;if(a!=="delst")armed=false;
+  <div class="row"><button data-a="sksave">保存</button>未評価の既定値 ${inp("dv",T.dv,"n","type=number class=t")}<small id="skmsg"></small></div></div>
+  <h3>店舗情報の共有</h3><div class="card">
+  <small>この店舗の時給・固定人件費・社員・ポジション・定数・評価値を、同じ店舗の人に渡せます(シフトの内容は含みません)。</small>
+  <div class="row"><label><input type="checkbox" id="shod"> OneDriveのファイル場所も含める</label></div>
+  <div class="row"><button data-a="shnative">共有する</button><button data-a="shlink" class="ghost">リンクをコピー</button><button data-a="shtext" class="ghost">テキストをコピー</button></div>
+  <small id="shmsg"></small>
+  <div class="row" style="margin-top:14px"><b>受け取った内容を取り込む</b></div>
+  <textarea id="shin" rows="3" style="width:100%" placeholder="受け取ったリンクまたはテキストを貼り付け"></textarea>
+  <div class="row"><button data-a="shread">読み取る</button></div>
+  <div id="impbox"></div></div>`;shRefresh();renderImp()}
+$("v3").oninput=e=>{const t=e.target,b=t.dataset.b;if(t.dataset.g){S[t.dataset.g]=t.value.trim();save();return}if(!b)return;let v=t.value;if(t.dataset.t==="n")v=+v||0;if(t.dataset.t==="z")v=v===""?null:+v;
+  setP(ST(),b,v);save();if(b==="name")fillStores();shRefresh()};
+$("v3").onchange=e=>{if(e.target.dataset.rr)renderReg();if(e.target.id==="rs")switchStore(+e.target.value);if(e.target.id==="shod")shRefresh()};
+$("v3").onclick=e=>{const d=e.target.dataset,a=d.a,T=ST();if(!a)return;if(a!=="delst")armed=false;if(a.indexOf("sh")===0||a.indexOf("imp")===0){shAct(a);return}
   if(a==="addst"){const n=JSON.parse(JSON.stringify(T));n.id=Date.now();n.name=T.name+"(コピー)";n.days={};n.skill={};n.cur=null;S.stores.push(n);switchStore(n.id);return}
   if(a==="delst"){if(S.stores.length<2)return;if(!armed){armed=true;renderReg();return}armed=false;S.stores=S.stores.filter(s=>s.id!==T.id);switchStore(S.stores[0].id);return}
   if(a==="sksave"){try{const o=JSON.parse($("sk").value||"{}");if(typeof o!=="object"||Array.isArray(o))throw 0;T.skill=o;save();$("skmsg").textContent="保存しました"}catch(x){$("skmsg").textContent="JSON形式が不正です"}return}
+  if(a==="odout"){localStorage.removeItem("od-tok");alert&&0;renderReg();return}
   if(a==="addemp")T.emps.push({n:"",v:0});if(a==="delemp")T.emps.splice(+d.i,1);
   if(a==="addpos")T.pos.push(P("","normal","","",null,null,null));if(a==="delpos")T.pos.splice(+d.i,1);
   if(a==="up"&&+d.i>0){const i=+d.i;[T.pos[i-1],T.pos[i]]=[T.pos[i],T.pos[i-1]]}
@@ -229,7 +254,97 @@ $("add").onclick=()=>{const D=DY()[cur];if(!D)return;D.rows.push({n:"",s:17,e:22
 $("hol").onchange=e=>{const D=DY()[cur];if(!D)return;D.hol=e.target.checked;save();draw()};
 $("rst").onclick=()=>{const D=DY()[cur];if(!D||!D.orig)return;const o=JSON.parse(D.orig);D.rows=o.rows;D.tg=o.tg;D.del=[];D.ov={};save();draw()};
 $("cp").onclick=()=>navigator.clipboard.writeText($("out").textContent).then(()=>$("cp").textContent="コピーしました");
-cur=ST().cur;fillStores();init();renderReg();
+const OD={ep:"https://login.microsoftonline.com/consumers/oauth2/v2.0/"};
+const MS_CLIENT_ID="";const cid=()=>S.cid||MS_CLIENT_ID;
+const odSc=loc=>(/^https?:/i.test(loc||"")?"Files.ReadWrite.All":"Files.Read")+" offline_access";
+const redir=()=>location.origin+location.pathname;
+const b64u=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+const rnd=n=>b64u(crypto.getRandomValues(new Uint8Array(n)));
+async function odLogin(sc){const v=rnd(48),st=rnd(16),ch=b64u(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v)));
+  localStorage.setItem("od-pkce",JSON.stringify({v,st,sc}));localStorage.setItem("od-go","1");
+  location.href=OD.ep+"authorize?"+new URLSearchParams({client_id:cid(),response_type:"code",redirect_uri:redir(),response_mode:"query",scope:sc,code_challenge:ch,code_challenge_method:"S256",state:st})}
+async function tokenReq(p,sc){const r=await fetch(OD.ep+"token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({client_id:cid(),scope:sc,...p})});
+  const j=await r.json();if(!r.ok)throw new Error(j.error_description||j.error);
+  const old=JSON.parse(localStorage.getItem("od-tok")||"{}");
+  localStorage.setItem("od-tok",JSON.stringify({at:j.access_token,rt:j.refresh_token||old.rt,exp:Date.now()+j.expires_in*1000-60000,sc}))}
+async function odToken(sc){const t=JSON.parse(localStorage.getItem("od-tok")||"null");if(t&&t.sc===sc&&t.exp>Date.now())return t.at;
+  if(t&&t.rt&&t.sc===sc){try{await tokenReq({grant_type:"refresh_token",refresh_token:t.rt},sc);return JSON.parse(localStorage.getItem("od-tok")).at}catch(e){}}return null}
+async function odCallback(){const q=new URLSearchParams(location.search);if(!q.get("code")&&!q.get("error"))return false;
+  const sv=JSON.parse(localStorage.getItem("od-pkce")||"{}");history.replaceState(null,"",location.pathname);localStorage.removeItem("od-pkce");
+  if(q.get("error")){localStorage.removeItem("od-go");msg("Microsoftのログインに失敗しました: "+(q.get("error_description")||q.get("error")));return false}
+  if(q.get("state")!==sv.st){localStorage.removeItem("od-go");msg("ログインの確認に失敗しました。もう一度試してください");return false}
+  try{await tokenReq({grant_type:"authorization_code",code:q.get("code"),redirect_uri:redir(),code_verifier:sv.v},sv.sc);return true}
+  catch(e){localStorage.removeItem("od-go");msg("ログインの処理に失敗しました: "+e.message);return false}}
+function odBase(loc){loc=loc.trim();
+  if(/^https?:/i.test(loc))return "https://graph.microsoft.com/v1.0/shares/u!"+btoa(unescape(encodeURIComponent(loc))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")+"/driveItem";
+  return "https://graph.microsoft.com/v1.0/me/drive/root:"+("/"+loc.replace(/^\/+/,"")).split("/").map(encodeURIComponent).join("/")+":"}
+async function odLoad(){const T=ST();
+  if(!cid()){msg("登録情報の「OneDrive連携」に、クライアントIDを入力してください");return}
+  if(!T.od){msg("登録情報の店舗欄に、OneDriveのファイル(共有リンクかパス)を入力してください");return}
+  const sc=odSc(T.od),tk=await odToken(sc);if(!tk){msg("Microsoftのログイン画面に移動します…");setTimeout(()=>odLogin(sc),400);return}
+  msg("OneDriveから読み込み中…");
+  const base=odBase(T.od),H={Authorization:"Bearer "+tk};
+  try{let buf;
+    try{const r=await fetch(base+"/content",{headers:H});if(!r.ok)throw new Error("HTTP "+r.status);buf=await r.arrayBuffer()}
+    catch(e1){if(String(e1.message).startsWith("HTTP"))throw e1;
+      const r=await fetch(base,{headers:H});if(!r.ok)throw new Error("HTTP "+r.status);const j=await r.json();
+      const d=await fetch(j["@microsoft.graph.downloadUrl"]);if(!d.ok)throw new Error("HTTP "+d.status);buf=await d.arrayBuffer()}
+    load(buf)}
+  catch(e){const m=String(e.message);
+    if(m==="HTTP 401"){localStorage.removeItem("od-tok");msg("ログインの有効期限が切れました。もう一度ボタンを押してください")}
+    else if(m==="HTTP 404"||m==="HTTP 403")msg("ファイルが見つからない、または開く権限がありません("+m+")。ファイルの場所と共有設定を確認してください");
+    else msg("読み込みに失敗しました: "+m)}}
+$("od").onclick=()=>odLoad();
+{const now=new Date(),sel=S.sel||{m:now.getMonth()+1,h:now.getDate()<=15?"前半":"後半"};
+ $("mm").innerHTML=[...Array(12)].map((_,i)=>`<option value="${i+1}">${i+1}月</option>`).join("");$("mm").value=sel.m;$("hf").value=sel.h;
+ $("mm").onchange=$("hf").onchange=()=>{S.sel={m:+$("mm").value,h:$("hf").value};save();if(WB)pick()}}
+
+let SH=null,shT=null,IMP=null,armedImp=false;
+const unb64u=s=>{s=s.replace(/-/g,"+").replace(/_/g,"/");while(s.length%4)s+="=";return Uint8Array.from(atob(s),c=>c.charCodeAt(0))};
+async function pack(o){const raw=new TextEncoder().encode(JSON.stringify(o));
+  if(typeof CompressionStream!=="undefined"){const cs=new Blob([raw]).stream().pipeThrough(new CompressionStream("deflate-raw"));return "1"+b64u(await new Response(cs).arrayBuffer())}
+  return "0"+b64u(raw)}
+async function unpack(p){let bytes;try{bytes=unb64u(p.slice(1))}catch(e){throw new Error("データが壊れています(途中で切れた可能性があります)")}
+  try{if(p[0]==="1"){if(typeof DecompressionStream==="undefined")throw new Error("この端末のブラウザは圧縮形式に対応していません。別のブラウザで開いてください");
+      const ds=new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));return JSON.parse(new TextDecoder().decode(await new Response(ds).arrayBuffer()))}
+    if(p[0]==="0")return JSON.parse(new TextDecoder().decode(bytes))}
+  catch(e){if(/対応していません/.test(e.message))throw e;throw new Error("データが壊れています(途中で切れた可能性があります)")}
+  throw new Error("店舗情報の形式ではありません")}
+const cl=(s,n=60)=>String(s==null?"":s).replace(/[<>"'&`\\]/g,"").slice(0,n);
+const nu=(x,d=0)=>Number.isFinite(+x)?+x:d;
+function sane(o){if(!o||o.t!=="shift-store")throw new Error("店舗情報の形式ではありません");
+  const R=["normal","parent","child","reg","free"],zn=x=>x==null||x===""?null:nu(x);
+  const pos=(Array.isArray(o.pos)?o.pos:[]).slice(0,60).map(p=>({n:cl(p.n),role:R.includes(p.role)?p.role:"normal",parent:cl(p.parent),kw:cl(p.kw),ab:cl(p.ab,10),wk:zn(p.wk),fs:zn(p.fs),sat:zn(p.sat)}));
+  const emps=(Array.isArray(o.emps)?o.emps:[]).slice(0,100).map(e=>({n:cl(e.n),v:nu(e.v)}));
+  const skill={};Object.keys(o.skill||{}).slice(0,300).forEach(k=>{const d=o.skill[k]||{},r={};Object.keys(d).slice(0,60).forEach(q=>{if(Number.isFinite(+d[q]))r[cl(q)]=+d[q]});skill[cl(k)]=r});
+  return{name:cl(o.name)||"店舗",wage:nu(o.wage),daily:nu(o.daily),dv:nu(o.dv,3),emps,pos,skill,od:String(o.od||"").replace(/[<>"'`\\]/g,"").slice(0,600)}}
+const shareObj=od=>{const T=ST();return{v:1,t:"shift-store",name:T.name,wage:T.wage,daily:T.daily,dv:T.dv,emps:T.emps,pos:T.pos,skill:T.skill,...(od&&T.od?{od:T.od}:{})}};
+function shRefresh(){clearTimeout(shT);SH=null;shT=setTimeout(async()=>{try{const p=await pack(shareObj($("shod")&&$("shod").checked));SH={url:location.origin+location.pathname+"#share="+p,txt:"SHIFTv1."+p}}catch(e){}},150)}
+async function shRead(text){text=(text||"").trim();let p;const i=text.indexOf("#share=");
+  if(i>=0)p=text.slice(i+7).split(/\s/)[0];else if(text.indexOf("SHIFTv1.")===0)p=text.slice(8).split(/\s/)[0];else p=text.replace(/\s+/g,"");
+  if(!p)throw new Error("貼り付けた内容が空です");if(p.length>300000)throw new Error("データが大きすぎます");
+  IMP=sane(await unpack(p));armedImp=false;renderImp()}
+function renderImp(){const b=$("impbox");if(!b)return;if(!IMP){b.innerHTML="";return}const I=IMP;
+  b.innerHTML=`<div class="card"><b>${I.name}</b><br><small>時給 ${I.wage}円 / 固定 ${I.daily}円 / 社員 ${I.emps.length}人 / ポジション ${I.pos.length}個 / 評価 ${Object.keys(I.skill).length}人分${I.od?" / OneDriveの場所あり":""}</small>
+  <div class="row"><button data-a="impover">${armedImp?"本当に上書きする":"現在の店舗「"+ST().name+"」に上書き"}</button><button data-a="impnew" class="ghost">新しい店舗として追加</button><button data-a="impno" class="ghost">やめる</button></div></div>`}
+function shFallback(t){const x=$("shin");if(x){x.value=t;x.focus();x.select()}}
+function cpy(t,msg){const m=$("shmsg"),ok=()=>{if(m)m.textContent=msg},ng=()=>{if(m)m.textContent="自動でコピーできませんでした。上の入力欄に表示したので、全選択してコピーしてください";shFallback(t)};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(ok).catch(ng);else ng()}
+function shAct(a){const m=t=>{const e=$("shmsg");if(e)e.textContent=t};
+  if(a==="shlink"||a==="shtext"||a==="shnative"){if(!SH){m("準備中です。少し待ってからもう一度押してください");shRefresh();return}
+    if(a==="shlink")return cpy(SH.url,"リンクをコピーしました。LINEなどに貼り付けて送ってください");
+    if(a==="shtext")return cpy(SH.txt,"テキストをコピーしました。LINEなどに貼り付けて送ってください");
+    if(navigator.share)navigator.share({title:"店舗情報",text:SH.url}).catch(()=>{});else cpy(SH.url,"この端末には共有メニューが無いため、リンクをコピーしました");return}
+  if(a==="shread"){shRead($("shin").value).then(()=>m("読み取りました。内容を確認して、取り込み方を選んでください")).catch(e=>{IMP=null;renderImp();m("読み取れませんでした: "+e.message)});return}
+  if(a==="impno"){IMP=null;armedImp=false;renderImp();return}
+  if(a==="impnew"&&IMP){const I=IMP,id=Date.now();S.stores.push({id,name:I.name,wage:I.wage,daily:I.daily,dv:I.dv,emps:I.emps,pos:I.pos,skill:I.skill,od:I.od,days:{},cur:null});IMP=null;armedImp=false;switchStore(id);setTimeout(()=>m("新しい店舗として追加しました"),0);return}
+  if(a==="impover"&&IMP){if(!armedImp){armedImp=true;renderImp();return}const T=ST(),I=IMP;Object.assign(T,{wage:I.wage,daily:I.daily,dv:I.dv,emps:I.emps,pos:I.pos,skill:I.skill});if(I.od)T.od=I.od;IMP=null;armedImp=false;save();renderReg();setTimeout(()=>m("現在の店舗に取り込みました"),0)}}
+async function shBoot(){if(location.hash.indexOf("#share=")!==0)return;const h=location.hash;history.replaceState(null,"",location.pathname+location.search);
+  let err="";try{await shRead(h)}catch(e){IMP=null;err=e.message}
+  document.querySelector('#nav [data-n="3"]').click();
+  setTimeout(()=>{const m=$("shmsg");if(m)m.textContent=err?"リンクの内容を読み取れませんでした: "+err:"受け取った店舗情報を読み取りました。内容を確認して、取り込み方を選んでください";const b=$("impbox");if(b&&!err)b.scrollIntoView({block:"center"})},50)}
+cur=ST().cur;fillStores();init();renderReg();shBoot();window.addEventListener("hashchange",shBoot);
+odCallback().then(ok=>{if(ok&&localStorage.getItem("od-go")){localStorage.removeItem("od-go");odLoad()}});
 if(typeof XLSX==="undefined")$("msg").textContent="Excel読込ライブラリを取得できていません(ネット接続を確認)";
 </script>
 <script>
