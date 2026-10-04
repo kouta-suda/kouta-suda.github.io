@@ -257,7 +257,7 @@ $("cp").onclick=()=>navigator.clipboard.writeText($("out").textContent).then(()=
 const OD={ep:"https://login.microsoftonline.com/consumers/oauth2/v2.0/"};
 const MS_CLIENT_ID="9213538a-5ee5-4bba-ab29-691d334b95fe";const cid=()=>S.cid||MS_CLIENT_ID;
 const odSc=loc=>(/^https?:/i.test(loc||"")?"Files.ReadWrite.All":"Files.Read")+" offline_access";
-const redir=()=>location.origin+location.pathname;
+const redir=()=>{let p=location.pathname;if(p.endsWith("/"))p+="shift_app.html";else if(!/\.html?$/.test(p))p+=".html";return location.origin+p};
 const b64u=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 const rnd=n=>b64u(crypto.getRandomValues(new Uint8Array(n)));
 async function odLogin(sc){const v=rnd(48),st=rnd(16),ch=b64u(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v)));
