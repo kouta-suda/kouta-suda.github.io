@@ -64,25 +64,53 @@ html.locked body>*:not(#gate){display:none!important}
 #pin{margin-bottom:14px;font-size:24px;letter-spacing:.4em;text-align:center;padding:9px 0 9px .4em}
 #pinbtn{padding:10px;font-size:16px}
 #pinmsg{display:block;margin-top:12px;min-height:1.4em;color:#dc2626}
+
+/* ---- 簡略レイアウト(人数カウント版) ---- */
+:root{--okfg:#15803d;--lobg:#fee2e2;--lofg:#b91c1c;--hibg:#fef3c7;--hifg:#92400e}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--okfg:#4ade80;--lobg:#4a1d1d;--lofg:#fca5a5;--hibg:#43310f;--hifg:#fcd34d}}
+:root[data-theme="dark"]{--okfg:#4ade80;--lobg:#4a1d1d;--lofg:#fca5a5;--hibg:#43310f;--hifg:#fcd34d}
+header{padding:10px 16px;margin:0 0 10px;border-radius:14px}
+header h1{font-size:18px}
+details{padding:8px 12px;margin:6px 0}
+details.sub{background:none;border:0;border-top:1px dashed var(--bd);border-radius:0;box-shadow:none;padding:6px 0 0;margin:6px 0 0}
+summary{font-size:14px}
+.top select{flex:1 1 0}
+#d{font-size:16px}
+.btnl{display:inline-block;padding:8px 14px;border-radius:10px;font-weight:600;cursor:pointer;font-size:15px}
+.badges{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 6px}
+.bd{font-size:13px;font-weight:700;padding:3px 10px;border-radius:12px;border:1px solid var(--bd);background:var(--card);white-space:nowrap}
+.bd.ok{color:var(--okfg);border-color:var(--okfg)}
+.bd.lo{background:var(--lobg);color:var(--lofg);border-color:var(--lofg)}
+.bd.hi{background:var(--hibg);color:var(--hifg);border-color:var(--hifg)}
+.pr{background:var(--card);border:1px solid var(--bd);border-left:5px solid var(--ac2);border-radius:12px;margin:6px 0;box-shadow:var(--shadow)}
+.pr.open{border-color:var(--ac)}
+.pr.emp{border-left-color:#f59e0b}
+.ph{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,auto);gap:10px;align-items:center;padding:9px 12px;cursor:pointer}
+.pn{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pt{color:var(--mut);font-variant-numeric:tabular-nums}
+.pp{color:var(--ac);font-weight:700;max-width:9em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pe{padding:2px 12px 10px;border-top:1px dashed var(--bd)}
+.empty{padding:14px;text-align:center;color:var(--mut)}
+.drow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0}
+.inp{padding:6px 12px}
 </style></head>
 <body>
 <div id="gate"><div class="gbox"><h2>シフト作成</h2><p>4桁の番号を入力してください</p><input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" aria-label="4桁の番号"><button id="pinbtn">開く</button><small id="pinmsg"></small></div></div>
 <header><h1 id="ttl">シフト作成</h1><span id="sn"></span></header>
 <main id="v1" class="on">
-<div class="row"><select id="st" style="flex:1"></select></div>
-<div class="row"><select id="mm"></select><select id="hf"><option>前半</option><option>後半</option></select><button id="od">OneDriveから読み込む</button></div>
-<div class="row"><input type="file" id="f" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
+<div class="row top"><select id="st"></select><select id="d"></select><label><input type="checkbox" id="hol"> 祝日</label></div>
+<details id="ld"><summary id="lds">Excelを読み込む</summary>
+<div class="row"><select id="mm"></select><select id="hf"><option>前半</option><option>後半</option></select></div>
+<div class="row"><button id="od">OneDriveから読み込む</button><label class="btnl ghost">ファイルを選ぶ<input type="file" id="f" hidden accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label></div>
 <div class="row"><select id="sh" style="display:none;flex:1"></select></div>
-<div class="row"><small id="msg">月と前半・後半を選んで、Excelを読み込んでください</small></div>
-<div class="row"><select id="d" style="flex:1"></select><label><input type="checkbox" id="hol"> 祝日</label><button id="rst">Excelに戻す</button></div>
-<h3>人員</h3><div id="rows"></div>
-<div class="row"><button id="add">＋ 追加</button></div>
-<h3>定数・評価</h3><div id="pos" class="card"></div>
-<h3>削除した人</h3><div id="del"></div>
-<h3>当日入力</h3>
-<div class="row">予約 <input id="g" type="number" class="t" placeholder="組">組 <input id="pp" type="number" class="t" placeholder="名">名</div>
-<div class="row">売上目標 <input id="tg" type="number" style="flex:1" placeholder="円"></div>
-<div class="row">備考 <input id="nt" style="flex:1" placeholder="備考(任意)"></div>
+<small id="msg">月と前半・後半を選んで、Excelを読み込んでください</small>
+</details>
+<div id="pos" class="badges"></div>
+<div id="rows"></div>
+<div class="row"><button id="add">＋ 人を追加</button></div>
+<details id="dd"><summary>削除した人 <span id="dn"></span></summary><div id="del"></div><div class="row"><button id="rst" class="ghost">この日をExcelの内容に戻す</button></div></details>
+<div class="card inp"><div class="row">予約 <input id="g" type="number" class="t" placeholder="組" inputmode="numeric">組 <input id="pp" type="number" class="t" placeholder="名" inputmode="numeric">名 売上 <input id="tg" type="number" style="flex:1 1 90px" placeholder="円" inputmode="numeric"></div>
+<div class="row"><input id="nt" style="flex:1" placeholder="備考(任意)"></div></div>
 <h3>出力</h3><pre id="out"></pre>
 <div class="row"><button id="cp">コピー</button><small id="lb"></small></div>
 </main>
@@ -110,40 +138,38 @@ const wid=s=>[...s].reduce((a,c)=>a+(c.charCodeAt(0)>255?2:1),0);
 const pad=(s,w)=>s+" ".repeat(Math.max(w-wid(s),0));
 const prep=t=>(t||"").normalize("NFKC").replace(/(\d)[.,、・](\d)階/g,"$1階$2階");
 const setP=(o,path,v)=>{const k=path.split(".");let t=o;for(let i=0;i<k.length-1;i++)t=t[k[i]];t[k[k.length-1]]=v};
-function avail(T,t){return T.pos.filter(p=>p[t]!=null&&!(p.role==="parent"&&T.pos.some(c=>c.role==="child"&&c.parent===p.n&&c[t]!=null)))}
 function ensure(r){if(r.ps)return;const T=ST(),t=prep(r.p),f=[];
   T.pos.forEach(p=>{const ix=Math.min(...kws(p).map(k=>{const j=t.indexOf(k);return j<0?1e9:j}));if(ix<1e9)f.push([ix,p.n])});
   f.sort((a,b)=>a[0]-b[0]);r.ps=f.map(x=>x[1]);r.x=r.ps.length?"":(r.p||"")}
 const posTxt=r=>{ensure(r);const ab=n=>{const q=ST().pos.find(p=>p.n===n);return q?(q.ab!==undefined?q.ab:(n==="ホール"?"ホ":""))||n:n};
   return[r.ps.length>1?r.ps.map(ab).join(""):r.ps.join(""),r.x].filter(Boolean).join(" ")};
-function rate(n,p,dv){const d=ST().skill[n]||{};for(const k of [...kws(p),p.parent])if(k&&d[k]!==undefined)return +d[k];return dv}
-function posSel(r,i){ensure(r);return `<div class="row" style="width:100%">`+avail(ST(),dtype(DY()[cur])).map(p=>{const k=r.ps.indexOf(p.n);
-  return `<button class="chip ${k>=0?"on":"off"}" data-i="${i}" data-c="${p.n}">${p.n}${k>=0&&r.ps.length>1?"①②③④⑥⑦"[k]:""}</button>`}).join("")+
-  `<input style="flex:1 1 90px" placeholder="その他" value="${r.x}" data-i="${i}" data-k="x"></div>`}
-function board(rows,D){
-  const T=ST(),t=dtype(D),names=avail(T,t).map(p=>p.n),G=n=>T.pos.find(p=>p.n===n),dv=+T.dv||3,we=t!=="wk";
-  const sc={},cn={},ppl={},rc={};let free=0;
-  rows.forEach(r=>{ensure(r);const ps=r.ps.filter(n=>names.includes(n)),core=ps.filter(n=>["normal","child","parent"].includes(G(n).role));
-    ps.forEach(n=>{const q=G(n);if(q.role==="reg")rc[n]=(rc[n]||0)+1;if(q.role==="free")free++});
-    core.forEach((n,i)=>{const b=rate(r.n,G(n),dv),m=rate(r.n,G(core[0]),dv),v=core.length<2?b:(we?(i?b+1:b-1):m-1),q=G(n);
-      sc[n]=(sc[n]||0)+v;cn[n]=(cn[n]||0)+1;if(q.role==="child")(ppl[q.parent]=ppl[q.parent]||new Set()).add(r)})});
-  const ov=D.ov||{},man={},auto={},kids=p=>T.pos.filter(c=>c.role==="child"&&c.parent===p.n&&c[t]!=null),
-    top=T.pos.filter(p=>(p.role==="normal"||p.role==="parent")&&p[t]!=null),ovr=p=>{if(ov[p.n]!==undefined){auto[p.n]=sc[p.n]||0;sc[p.n]=ov[p.n];man[p.n]=1}};
-  T.pos.filter(p=>p.role==="child"&&p[t]!=null).forEach(ovr);
-  top.forEach(p=>{const k=kids(p);if(p.role==="parent"&&k.length){sc[p.n]=k.reduce((x,c)=>x+(sc[c.n]||0),0);cn[p.n]=(ppl[p.n]||new Set()).size}});
-  T.pos.filter(p=>p.role==="reg"&&p[t]!=null&&p.parent).forEach(p=>sc[p.parent]=(sc[p.parent]||0)+(rc[p.n]||0));
-  top.forEach(p=>sc[p.n]=(sc[p.n]||0)+free);top.forEach(ovr);
-  const line=(lb,v,st,ex,ind,key)=>{const bad=st>0&&v<st,m=man[key];
-    return `<div style="${ind?"margin-left:1.2em;":""}color:${bad?"#dc2626":"inherit"}">${bad?"⚠":""}${lb} 評価 <input type="number" step="0.5" data-ov="${key}" value="${+v.toFixed(1)}" style="width:62px;padding:2px 4px;${m?"border:2px solid #f59e0b;background:#fef3c7;color:#111":""}">${st>0?" / "+st:""}${ex||""}${m?` <small style="color:#d97706">✎手入力(自動 ${+auto[key].toFixed(1)})</small> <button class="chip ghost" data-ovr="${key}">戻す</button>`:""}</div>`};
-  let h="",tot=0,ts=0;
-  top.forEach(p=>{tot+=sc[p.n]||0;ts+=p[t]||0;h+=line(p.n,sc[p.n]||0,p[t],` (${cn[p.n]||0}人)`,0,p.n);
-    if(p.role==="parent")kids(p).forEach(c=>h+=line(c.n,sc[c.n]||0,c[t],` (${cn[c.n]||0}人)`,1,c.n))});
-  T.pos.filter(p=>(p.role==="reg"||p.role==="free")&&p[t]!=null).forEach(p=>{const c=p.role==="reg"?rc[p.n]||0:free,bad=p[t]>0&&c<p[t];
-    h+=`<div style="color:${bad?"#dc2626":"inherit"}">${bad?"⚠":""}${p.n} ${c}人${p[t]>0?" / "+p[t]:""}</div>`});
-  h+=`<div><b>合計評価 ${+tot.toFixed(1)} / ${ts}${Object.keys(man).length?" ✎手入力あり":""}</b></div>`;
-  const oth=rows.filter(r=>r.x);if(oth.length)h+=`<div><small>その他: ${oth.map(r=>r.n+"("+r.x+")").join("、")}</small></div>`;
-  return h}
-const msg=t=>{$("msg").textContent=t};
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let OPEN=null;
+const REGOPEN=new Set();
+const kid=r=>r.k||(r.k=Math.random().toString(36).slice(2,8));
+const sortRows=D=>{D.rows.sort((a,b)=>a.s-b.s)};
+const cnt=(p,t)=>{const v=p["c"+t];return v===undefined||v===null?(p[t]!=null?"1":""):String(v)};
+function rng(p,t){const s=cnt(p,t).normalize("NFKC").replace(/[~〜～ー–—－]/g,"-").replace(/\s+/g,"");
+  if(s==="")return null;const m=s.match(/^(\d+)(?:-(\d+))?$/);if(!m)return null;
+  const a=+m[1],b=m[2]!==undefined?+m[2]:a;
+  if(m[2]===undefined&&a===0)return{lo:0,hi:Infinity};
+  return{lo:Math.min(a,b),hi:Math.max(a,b)}}
+function avail(T,t){return T.pos.filter(p=>p.n&&rng(p,t)&&!(p.role==="parent"&&T.pos.some(c=>c.role==="child"&&c.parent===p.n&&rng(c,t))))}
+function chips(r,k){ensure(r);
+  return `<div class="row">`+avail(ST(),dtype(DY()[cur])).map(p=>{const i=r.ps.indexOf(p.n);
+    return `<button class="chip ${i>=0?"on":"off"}" data-r="${k}" data-c="${esc(p.n)}">${esc(p.n)}${i>=0&&r.ps.length>1?("①②③④⑤⑥⑦⑧⑨"[i]||""):""}</button>`}).join("")+`</div>`}
+function rowHTML(r){const k=kid(r),open=OPEN===k,emp=ST().emps.some(e=>e.n&&e.n===r.n);ensure(r);
+  return `<div class="pr${emp?" emp":""}${open?" open":""}" data-key="${k}"><div class="ph" data-tog="${k}"><span class="pn">${esc(r.n)||"（名前未入力）"}</span><span class="pt">${num(r.s)}-${num(r.e)}</span><span class="pp">${esc(posTxt(r))}</span></div>`+
+  (open?`<div class="pe"><div class="row"><input class="n" placeholder="名前" value="${esc(r.n)}" data-r="${k}" data-f="n"><input class="t" type="number" step="0.5" inputmode="decimal" value="${r.s}" data-r="${k}" data-f="s"> 〜 <input class="t" type="number" step="0.5" inputmode="decimal" value="${r.e}" data-r="${k}" data-f="e"></div>${chips(r,k)}<div class="row"><input style="flex:1 1 120px" placeholder="その他（自由記述）" value="${esc(r.x)}" data-r="${k}" data-f="x"><button class="del" data-delr="${k}">外す</button><button class="ghost" data-tog="${k}">閉じる</button></div></div>`:"")+`</div>`}
+function board(rows,D){const T=ST(),t=dtype(D);
+  if(!T.pos.length)return "<small>登録情報でポジションを登録すると、ここに人数が出ます</small>";
+  rows.forEach(r=>ensure(r));
+  return avail(T,t).map(p=>{const g=rng(p,t),c=rows.filter(r=>r.ps.includes(p.n)).length,lo=c<g.lo,hi=c>g.hi,
+    std=g.hi===Infinity?"":"/"+(g.lo===g.hi?g.lo:g.lo+"-"+g.hi);
+    return `<span class="bd ${lo?"lo":hi?"hi":"ok"}">${lo?"⚠ ":hi?"▲ ":""}${esc(p.n)} ${c}${std}</span>`}).join("")}
+function toggleRow(k){const D=DY()[cur];if(!D)return;OPEN=OPEN===k?null:k;sortRows(D);save();draw();
+  const el=OPEN?document.querySelector('.pr[data-key="'+k+'"]'):null;if(el)el.scrollIntoView({block:"nearest",behavior:"smooth"})}
+const msg=t=>{$("msg").textContent=t;$("ld").open=true};
 const nz=s=>(s||"").normalize("NFKC").replace(/\s+/g,"");
 function load(buf){WB=XLSX.read(buf,{type:"array",cellDates:true});pick()}
 function pick(){const N=WB.SheetNames,m=$("mm").value,hf=$("hf").value,sh=$("sh"),sn=nz(ST().name);
@@ -161,22 +187,21 @@ function parse(){const ws=WB.Sheets[$("sh").value],a=XLSX.utils.sheet_to_json(ws
       if(!n||n==="ホール"||n==="キッチン"||typeof s!=="number"||typeof e!=="number")continue;rows.push({n:String(n).trim(),s,e,ps:[],x:""})}
     rows.sort((x,y)=>x.s-y.s);const tg=parseInt(String(a[2]&&a[2][c]||"").replace(/,/g,""))||"";
     days[k]={wd:WD[d.getUTCDay()],rows,g:"",pp:"",tg,nt:"",orig:JSON.stringify({rows,tg})}});
-  if(!Object.keys(days).length){$("msg").textContent="「"+$("sh").value+"」に日付の行が見つかりません";return}
-  ST().days=days;setCur(Object.keys(days)[0]);save();init();$("msg").textContent=$("sh").value+": "+Object.keys(days).length+"日分を読み込みました"}
+  if(!Object.keys(days).length){msg("「"+$("sh").value+"」に日付の行が見つかりません");return}
+  ST().days=days;ST().src=$("sh").value;OPEN=null;setCur(Object.keys(days)[0]);save();$("msg").textContent=$("sh").value+": "+Object.keys(days).length+"日分を読み込みました";init()}
 function fillStores(){const o=S.stores.map(s=>`<option value="${s.id}" ${s.id===S.cs?"selected":""}>${s.name}</option>`).join("");
   $("st").innerHTML=o;if($("rs"))$("rs").innerHTML=o;$("sn").textContent=ST().name}
 function switchStore(id){S.cs=id;cur=ST().cur;save();fillStores();init();renderReg()}
-function init(){const k=Object.keys(DY());if(!cur||!DY()[cur])setCur(k[0]||null);
-  $("d").innerHTML=k.map(x=>`<option ${x===cur?"selected":""}>${x}</option>`).join("");draw()}
-function draw(){const T=ST(),D=DY()[cur];
-  if(!D){["rows","pos","del"].forEach(i=>$(i).innerHTML="");$("out").textContent="";$("lb").textContent="";return}
-  $("rows").innerHTML=D.rows.map((r,i)=>`<div class="card ${T.emps.some(e=>e.n===r.n)?"emp":""}"><div class="row">
-  <input class="n" value="${r.n}" data-i="${i}" data-k="n">
-  <input class="t" type="number" step="0.5" value="${r.s}" data-i="${i}" data-k="s">〜
-  <input class="t" type="number" step="0.5" value="${r.e}" data-i="${i}" data-k="e">
-  <button data-del="${i}" style="background:#ef4444">×</button></div>${posSel(r,i)}</div>`).join("");
+function init(){const T=ST(),k=Object.keys(DY());if(!cur||!DY()[cur])setCur(k[0]||null);
+  $("d").innerHTML=k.map(x=>`<option value="${x}" ${x===cur?"selected":""}>${x}(${DY()[x].wd})</option>`).join("");
+  $("lds").textContent=k.length?`${T.src||"読み込み済み"}・${k.length}日分`:"Excelを読み込む";
+  $("ld").open=!k.length;draw()}
+function draw(){const D=DY()[cur];
+  if(!D){["rows","pos","del"].forEach(i=>$(i).innerHTML="");$("out").textContent="";$("lb").textContent="";$("dn").textContent="";return}
   D.del=D.del||[];$("hol").checked=!!D.hol;
-  $("del").innerHTML=D.del.map((r,i)=>`<div class="card row">${r.n} ${r.s}-${r.e} ${posTxt(r)} <button data-res="${i}">戻す</button></div>`).join("")||"<small>なし</small>";
+  $("rows").innerHTML=D.rows.map(rowHTML).join("")||'<div class="empty">人員がいません。「＋ 人を追加」で入れてください</div>';
+  $("dn").textContent=D.del.length?`(${D.del.length})`:"";
+  $("del").innerHTML=D.del.map((r,i)=>`<div class="drow"><span>${esc(r.n)||"（名前未入力）"} ${num(r.s)}-${num(r.e)} ${esc(posTxt(r))}</span><button class="ghost" data-res="${i}">戻す</button></div>`).join("")||"<small>なし</small>";
   $("g").value=D.g;$("pp").value=D.pp;$("tg").value=D.tg;$("nt").value=D.nt;out()}
 function out(){const T=ST(),D=DY()[cur];if(!D)return;
   const rows=[...D.rows].sort((x,y)=>x.s-y.s),nw=Math.max(8,...rows.map(r=>wid(r.n)))+2,wage=+T.wage||0;
@@ -190,70 +215,76 @@ function out(){const T=ST(),D=DY()[cur];if(!D)return;
   if(t.length)L.push(t.join("   "));
   $("out").textContent=L.join("\n");$("pos").innerHTML=board(rows,D);
   $("lb").textContent="人件費 "+Math.round(labor).toLocaleString()+"円"}
-function renderReg(){const T=ST(),pn=T.pos.filter(p=>p.role==="parent").map(p=>p.n),
-  inp=(b,v,ty,ex)=>`<input data-b="${b}" ${ty?`data-t="${ty}"`:""} value="${v==null?"":String(v).replace(/"/g,"&quot;")}" ${ex||""}>`,
-  roles={normal:"通常",parent:"親(子の合計)",child:"子",reg:"レジ型(人数のみ・親に+1)",free:"フリー型(人数のみ・全体に+1)"};
-  $("v3").innerHTML=`<h3>店舗</h3><div class="card"><div class="row"><select id="rs" style="flex:1">${S.stores.map(s=>`<option value="${s.id}" ${s.id===T.id?"selected":""}>${s.name}</option>`).join("")}</select><button data-a="addst">＋複製して追加</button></div>
+function renderReg(){const T=ST(),pn=T.pos.filter(p=>p.role==="parent"&&p.n).map(p=>p.n),
+  inp=(b,v,ty,ex)=>`<input data-b="${b}" ${ty?`data-t="${ty}"`:""} value="${esc(v)}" ${ex||""}>`,
+  roles={normal:"通常",parent:"親(子の人数をまとめる)",child:"子"};
+  $("v3").innerHTML=`<h3>店舗</h3><div class="card"><div class="row"><select id="rs" style="flex:1">${S.stores.map(s=>`<option value="${s.id}" ${s.id===T.id?"selected":""}>${esc(s.name)}</option>`).join("")}</select><button data-a="addst">＋複製して追加</button></div>
   <div class="row">店舗名 ${inp("name",T.name,"","style='flex:1'")}</div>
   <div class="row">時給 ${inp("wage",T.wage,"n","type=number style='width:90px'")}円 毎日の固定人件費 ${inp("daily",T.daily,"n","type=number style='width:90px'")}円</div>
   <div class="row">OneDriveのファイル ${inp("od",T.od,"","style='flex:1' placeholder='共有リンク、または /フォルダ/ファイル名.xlsx'")}</div>
   <div class="row"><button data-a="delst" class="ghost" ${S.stores.length<2?"disabled":""}>${armed?"本当に削除する":"この店舗を削除"}</button></div></div>
-  <h3>OneDrive連携(共通)</h3><div class="card"><div class="row">クライアントID <input data-g="cid" value="${S.cid||""}" style="flex:1" placeholder="Microsoftで発行したID" autocomplete="off"></div>
-  <small>登録時に指定するリダイレクトURI: ${redir()}</small><div class="row"><button data-a="odout" class="ghost">Microsoftからログアウト</button></div></div>
   <h3>社員(シフトインした日に発生)</h3><div class="card">${T.emps.map((e,i)=>`<div class="row">${inp(`emps.${i}.n`,e.n,"","style='flex:1' placeholder='名前'")}${inp(`emps.${i}.v`,e.v,"n","type=number style='width:90px'")}円<button data-a="delemp" data-i="${i}" class="del">×</button></div>`).join("")}<button data-a="addemp">＋社員追加</button></div>
-  <h3>ポジション・定数</h3><small>基準は 平日(月〜木)/金・日・祝/土 ごと。空欄=その日は使わない、0=基準なしで使う</small>
+  <h3>ポジション・定数（人数）</h3><small>定数は人数です。範囲は「1-2」のように書きます。空欄=その曜日は使わない、0=人数の目安なし。</small>
   ${T.pos.map((p,i)=>`<div class="card"><div class="row">${inp(`pos.${i}.n`,p.n,"","style='flex:1' placeholder='名前'")}<button data-a="up" data-i="${i}" class="ghost">↑</button><button data-a="delpos" data-i="${i}" class="del">×</button></div>
-  <div class="row"><select data-b="pos.${i}.role" data-rr="1">${Object.entries(roles).map(([k,l])=>`<option value="${k}" ${p.role===k?"selected":""}>${l}</option>`).join("")}</select>
-  <select data-b="pos.${i}.parent"><option value="">親なし</option>${pn.map(n=>`<option ${p.parent===n?"selected":""}>${n}</option>`).join("")}</select></div>
-  <div class="row">平日${inp(`pos.${i}.wk`,p.wk,"z","type=number class=t")}金日祝${inp(`pos.${i}.fs`,p.fs,"z","type=number class=t")}土${inp(`pos.${i}.sat`,p.sat,"z","type=number class=t")}</div>
+  <div class="row">定数　平日${inp(`pos.${i}.cwk`,cnt(p,"wk"),"s","class=t placeholder=－")}金日祝${inp(`pos.${i}.cfs`,cnt(p,"fs"),"s","class=t placeholder=－")}土${inp(`pos.${i}.csat`,cnt(p,"sat"),"s","class=t placeholder=－")}</div>
+  <details class="sub" data-di="${i}" ${REGOPEN.has(i)?"open":""}><summary>詳細（種類・略称・判定語）</summary>
+  <div class="row"><select data-b="pos.${i}.role" data-rr="1">${Object.entries(roles).map(([k,l])=>`<option value="${k}" ${(p.role===k||(k==="normal"&&(p.role==="reg"||p.role==="free")))?"selected":""}>${l}</option>`).join("")}</select>
+  ${p.role==="child"?`<select data-b="pos.${i}.parent"><option value="">親を選ぶ</option>${pn.map(n=>`<option ${p.parent===n?"selected":""}>${esc(n)}</option>`).join("")}</select>`:""}</div>
   <div class="row">複数担当時の略称 ${inp(`pos.${i}.ab`,p.ab,"","style='flex:1' placeholder='空欄=そのまま'")}</div>
-  <div class="row">判定語 ${inp(`pos.${i}.kw`,p.kw,"","style='flex:1' placeholder='略称などをカンマ区切りで'")}</div></div>`).join("")}
+  <div class="row">判定語 ${inp(`pos.${i}.kw`,p.kw,"","style='flex:1' placeholder='略称などをカンマ区切りで'")}</div></details></div>`).join("")}
   <button data-a="addpos">＋ポジション追加</button>
-  <h3>評価辞書(5段階)</h3><div class="card"><textarea id="sk" rows="7" style="width:100%" placeholder='形式: {"名前":{"ポジション名":点数, ...}, ...}'>${Object.keys(T.skill).length?JSON.stringify(T.skill,null,1):""}</textarea>
-  <div class="row"><button data-a="sksave">保存</button>未評価の既定値 ${inp("dv",T.dv,"n","type=number class=t")}<small id="skmsg"></small></div></div>
   <h3>店舗情報の共有</h3><div class="card">
-  <small>この店舗の時給・固定人件費・社員・ポジション・定数・評価値を、同じ店舗の人に渡せます(シフトの内容は含みません)。</small>
+  <small>この店舗の時給・固定人件費・社員・ポジション・定数を、同じ店舗の人に渡せます(シフトの内容は含みません)。</small>
   <div class="row"><label><input type="checkbox" id="shod"> OneDriveのファイル場所も含める</label></div>
   <div class="row"><button data-a="shnative">共有する</button><button data-a="shlink" class="ghost">リンクをコピー</button><button data-a="shtext" class="ghost">テキストをコピー</button></div>
   <small id="shmsg"></small>
   <div class="row" style="margin-top:14px"><b>受け取った内容を取り込む</b></div>
   <textarea id="shin" rows="3" style="width:100%" placeholder="受け取ったリンクまたはテキストを貼り付け"></textarea>
   <div class="row"><button data-a="shread">読み取る</button></div>
-  <div id="impbox"></div></div>`;shRefresh();renderImp()}
-$("v3").oninput=e=>{const t=e.target,b=t.dataset.b;if(t.dataset.g){S[t.dataset.g]=t.value.trim();save();return}if(!b)return;let v=t.value;if(t.dataset.t==="n")v=+v||0;if(t.dataset.t==="z")v=v===""?null:+v;
+  <div id="impbox"></div></div>
+  <details><summary>OneDrive連携の詳細</summary><div class="row">クライアントID <input data-g="cid" value="${esc(S.cid||"")}" style="flex:1" placeholder="空欄でOK（ファイルに設定済み）" autocomplete="off"></div>
+  <small>登録時に指定するリダイレクトURI: ${redir()}</small><div class="row"><button data-a="odout" class="ghost">Microsoftからログアウト</button></div></details>`;shRefresh();renderImp()}
+$("v3").oninput=e=>{const t=e.target,b=t.dataset.b;if(t.dataset.g){S[t.dataset.g]=t.value.trim();save();return}if(!b)return;let v=t.value;if(t.dataset.t==="n")v=+v||0;if(t.dataset.t==="z")v=v===""?null:+v;if(t.dataset.t==="s")v=v.trim();
   setP(ST(),b,v);save();if(b==="name")fillStores();shRefresh()};
 $("v3").onchange=e=>{if(e.target.dataset.rr)renderReg();if(e.target.id==="rs")switchStore(+e.target.value);if(e.target.id==="shod")shRefresh()};
 $("v3").onclick=e=>{const d=e.target.dataset,a=d.a,T=ST();if(!a)return;if(a!=="delst")armed=false;if(a.indexOf("sh")===0||a.indexOf("imp")===0){shAct(a);return}
   if(a==="addst"){const n=JSON.parse(JSON.stringify(T));n.id=Date.now();n.name=T.name+"(コピー)";n.days={};n.skill={};n.cur=null;S.stores.push(n);switchStore(n.id);return}
   if(a==="delst"){if(S.stores.length<2)return;if(!armed){armed=true;renderReg();return}armed=false;S.stores=S.stores.filter(s=>s.id!==T.id);switchStore(S.stores[0].id);return}
-  if(a==="sksave"){try{const o=JSON.parse($("sk").value||"{}");if(typeof o!=="object"||Array.isArray(o))throw 0;T.skill=o;save();$("skmsg").textContent="保存しました"}catch(x){$("skmsg").textContent="JSON形式が不正です"}return}
   if(a==="odout"){localStorage.removeItem("od-tok");alert&&0;renderReg();return}
   if(a==="addemp")T.emps.push({n:"",v:0});if(a==="delemp")T.emps.splice(+d.i,1);
-  if(a==="addpos")T.pos.push(P("","normal","","",null,null,null));if(a==="delpos")T.pos.splice(+d.i,1);
-  if(a==="up"&&+d.i>0){const i=+d.i;[T.pos[i-1],T.pos[i]]=[T.pos[i],T.pos[i-1]]}
+  if(a==="addpos"){T.pos.push({n:"",role:"normal",parent:"",kw:"",ab:"",wk:0,fs:0,sat:0,cwk:"1",cfs:"1",csat:"1"});REGOPEN.clear()}if(a==="delpos"){T.pos.splice(+d.i,1);REGOPEN.clear()}
+  if(a==="up"&&+d.i>0){const i=+d.i;[T.pos[i-1],T.pos[i]]=[T.pos[i],T.pos[i-1]];REGOPEN.clear()}
   save();renderReg()};
 $("nav").onclick=e=>{const b=e.target.closest("button");if(!b)return;const n=b.dataset.n;
   [1,2,3,4].forEach(i=>{$("v"+i).classList.toggle("on",i==n)});[...$("nav").children].forEach(x=>x.classList.toggle("on",x===b));
   $("ttl").textContent=b.lastChild.textContent;if(n==3)renderReg();if(n==1)draw();window.scrollTo(0,0)};
 $("f").onchange=async e=>{const f=e.target.files[0];if(!f)return;
-  if(typeof XLSX==="undefined"){$("msg").textContent="Excel読込ライブラリを取得できていません。ネット接続とブラウザを確認してください";return}
-  try{load(await f.arrayBuffer())}catch(x){$("msg").textContent="読み込みに失敗しました: "+x.message}};
+  if(typeof XLSX==="undefined"){msg("Excel読込ライブラリを取得できていません。ネット接続とブラウザを確認してください");return}
+  try{load(await f.arrayBuffer())}catch(x){msg("読み込みに失敗しました: "+x.message)}};
 $("sh").onchange=parse;$("st").onchange=e=>switchStore(+e.target.value);
-$("d").onchange=e=>{setCur(e.target.value);draw()};
-$("rows").oninput=e=>{const t=e.target,k=t.dataset.k;if(!k)return;const r=DY()[cur].rows[t.dataset.i];
-  r[k]=["s","e"].includes(k)?parseFloat(t.value)||0:t.value;save();out()};
-$("rows").onclick=e=>{const d=e.target.dataset,D=DY()[cur];
-  if(d.del!=null){D.del=D.del||[];D.del.push(...D.rows.splice(d.del,1));save();draw()}
-  if(d.c){const r=D.rows[d.i];ensure(r);const k=r.ps.indexOf(d.c);if(k>=0)r.ps.splice(k,1);else r.ps.push(d.c);save();draw()}};
-$("del").onclick=e=>{const i=e.target.dataset.res,D=DY()[cur];if(i!=null){D.rows.push(...D.del.splice(i,1));save();draw()}};
-$("pos").onchange=e=>{const k=e.target.dataset.ov;if(k===undefined)return;const D=DY()[cur];D.ov=D.ov||{};const v=parseFloat(e.target.value);if(isNaN(v))delete D.ov[k];else D.ov[k]=v;save();out()};
-$("pos").onclick=e=>{const k=e.target.dataset.ovr;if(k===undefined)return;delete DY()[cur].ov[k];save();out()};
-$("add").onclick=()=>{const D=DY()[cur];if(!D)return;D.rows.push({n:"",s:17,e:22,ps:[],x:""});save();draw()};
+const rowOf=k=>{const D=DY()[cur];return D&&D.rows.find(r=>r.k===k)};
+$("d").onchange=e=>{const o=DY()[cur];if(o)sortRows(o);setCur(e.target.value);OPEN=null;save();draw()};
+$("rows").oninput=e=>{const t=e.target,f=t.dataset.f;if(!f)return;const r=rowOf(t.dataset.r);if(!r)return;
+  r[f]=(f==="s"||f==="e")?(parseFloat(t.value)||0):t.value;save();out();
+  const h=document.querySelector('.pr[data-key="'+r.k+'"] .ph');
+  if(h){h.querySelector(".pn").textContent=r.n||"（名前未入力）";h.querySelector(".pt").textContent=num(r.s)+"-"+num(r.e);h.querySelector(".pp").textContent=posTxt(r)}};
+$("rows").onclick=e=>{const D=DY()[cur];if(!D)return;const tg=e.target;
+  const dl=tg.closest("[data-delr]");
+  if(dl){const k=dl.dataset.delr,i=D.rows.findIndex(r=>r.k===k);if(i>=0){D.del=D.del||[];D.del.push(...D.rows.splice(i,1));if(OPEN===k)OPEN=null;save();draw()}return}
+  const ch=tg.closest("[data-c]");
+  if(ch){const r=rowOf(ch.dataset.r);if(r){ensure(r);const n=ch.dataset.c,i=r.ps.indexOf(n);if(i>=0)r.ps.splice(i,1);else r.ps.push(n);save();draw()}return}
+  const tog=tg.closest("[data-tog]");if(tog)toggleRow(tog.dataset.tog)};
+$("del").onclick=e=>{const b=e.target.closest("[data-res]");if(!b)return;const D=DY()[cur];if(!D)return;
+  D.rows.push(...D.del.splice(+b.dataset.res,1));sortRows(D);save();draw()};
+$("add").onclick=()=>{const D=DY()[cur];if(!D)return;const r={n:"",s:17,e:22,ps:[],x:""},k=kid(r);
+  D.rows.push(r);OPEN=k;sortRows(D);save();draw();
+  const el=document.querySelector('[data-r="'+k+'"][data-f="n"]');if(el){el.focus();el.scrollIntoView({block:"center",behavior:"smooth"})}};
+$("v3").addEventListener("toggle",e=>{const i=e.target.dataset&&e.target.dataset.di;if(i!==undefined){if(e.target.open)REGOPEN.add(+i);else REGOPEN.delete(+i)}},true);
 [["g","g"],["pp","pp"],["tg","tg"],["nt","nt"]].forEach(([i,k])=>$(i).oninput=e=>{const D=DY()[cur];if(!D)return;
   D[k]=k==="nt"?e.target.value:(e.target.value===""?"":+e.target.value);save();out()});
 $("hol").onchange=e=>{const D=DY()[cur];if(!D)return;D.hol=e.target.checked;save();draw()};
-$("rst").onclick=()=>{const D=DY()[cur];if(!D||!D.orig)return;const o=JSON.parse(D.orig);D.rows=o.rows;D.tg=o.tg;D.del=[];D.ov={};save();draw()};
-$("cp").onclick=()=>navigator.clipboard.writeText($("out").textContent).then(()=>$("cp").textContent="コピーしました");
+$("rst").onclick=()=>{const D=DY()[cur];if(!D||!D.orig)return;const o=JSON.parse(D.orig);D.rows=o.rows;D.tg=o.tg;D.del=[];D.ov={};OPEN=null;save();draw()};
+$("cp").onclick=()=>{const b=$("cp");navigator.clipboard.writeText($("out").textContent).then(()=>{b.textContent="コピーしました";setTimeout(()=>b.textContent="コピー",1500)}).catch(()=>{b.textContent="コピーできませんでした"})};
 const OD={ep:"https://login.microsoftonline.com/consumers/oauth2/v2.0/"};
 const MS_CLIENT_ID="9213538a-5ee5-4bba-ab29-691d334b95fe";const cid=()=>S.cid||MS_CLIENT_ID;
 const odSc=loc=>(/^https?:/i.test(loc||"")?"Files.ReadWrite.All":"Files.Read")+" offline_access";
@@ -314,18 +345,18 @@ const cl=(s,n=60)=>String(s==null?"":s).replace(/[<>"'&`\\]/g,"").slice(0,n);
 const nu=(x,d=0)=>Number.isFinite(+x)?+x:d;
 function sane(o){if(!o||o.t!=="shift-store")throw new Error("店舗情報の形式ではありません");
   const R=["normal","parent","child","reg","free"],zn=x=>x==null||x===""?null:nu(x);
-  const pos=(Array.isArray(o.pos)?o.pos:[]).slice(0,60).map(p=>({n:cl(p.n),role:R.includes(p.role)?p.role:"normal",parent:cl(p.parent),kw:cl(p.kw),ab:cl(p.ab,10),wk:zn(p.wk),fs:zn(p.fs),sat:zn(p.sat)}));
+  const pos=(Array.isArray(o.pos)?o.pos:[]).slice(0,60).map(p=>({n:cl(p.n),role:R.includes(p.role)?p.role:"normal",parent:cl(p.parent),kw:cl(p.kw),ab:cl(p.ab,10),wk:zn(p.wk),fs:zn(p.fs),sat:zn(p.sat),...["cwk","cfs","csat"].reduce((a,k)=>p[k]==null?a:{...a,[k]:cl(p[k],8)},{})}));
   const emps=(Array.isArray(o.emps)?o.emps:[]).slice(0,100).map(e=>({n:cl(e.n),v:nu(e.v)}));
   const skill={};Object.keys(o.skill||{}).slice(0,300).forEach(k=>{const d=o.skill[k]||{},r={};Object.keys(d).slice(0,60).forEach(q=>{if(Number.isFinite(+d[q]))r[cl(q)]=+d[q]});skill[cl(k)]=r});
   return{name:cl(o.name)||"店舗",wage:nu(o.wage),daily:nu(o.daily),dv:nu(o.dv,3),emps,pos,skill,od:String(o.od||"").replace(/[<>"'`\\]/g,"").slice(0,600)}}
-const shareObj=od=>{const T=ST();return{v:1,t:"shift-store",name:T.name,wage:T.wage,daily:T.daily,dv:T.dv,emps:T.emps,pos:T.pos,skill:T.skill,...(od&&T.od?{od:T.od}:{})}};
+const shareObj=od=>{const T=ST();return{v:1,t:"shift-store",name:T.name,wage:T.wage,daily:T.daily,emps:T.emps,pos:T.pos,...(od&&T.od?{od:T.od}:{})}};
 function shRefresh(){clearTimeout(shT);SH=null;shT=setTimeout(async()=>{try{const p=await pack(shareObj($("shod")&&$("shod").checked));SH={url:location.origin+location.pathname+"#share="+p,txt:"SHIFTv1."+p}}catch(e){}},150)}
 async function shRead(text){text=(text||"").trim();let p;const i=text.indexOf("#share=");
   if(i>=0)p=text.slice(i+7).split(/\s/)[0];else if(text.indexOf("SHIFTv1.")===0)p=text.slice(8).split(/\s/)[0];else p=text.replace(/\s+/g,"");
   if(!p)throw new Error("貼り付けた内容が空です");if(p.length>300000)throw new Error("データが大きすぎます");
   IMP=sane(await unpack(p));armedImp=false;renderImp()}
 function renderImp(){const b=$("impbox");if(!b)return;if(!IMP){b.innerHTML="";return}const I=IMP;
-  b.innerHTML=`<div class="card"><b>${I.name}</b><br><small>時給 ${I.wage}円 / 固定 ${I.daily}円 / 社員 ${I.emps.length}人 / ポジション ${I.pos.length}個 / 評価 ${Object.keys(I.skill).length}人分${I.od?" / OneDriveの場所あり":""}</small>
+  b.innerHTML=`<div class="card"><b>${I.name}</b><br><small>時給 ${I.wage}円 / 固定 ${I.daily}円 / 社員 ${I.emps.length}人 / ポジション ${I.pos.length}個${I.od?" / OneDriveの場所あり":""}</small>
   <div class="row"><button data-a="impover">${armedImp?"本当に上書きする":"現在の店舗「"+ST().name+"」に上書き"}</button><button data-a="impnew" class="ghost">新しい店舗として追加</button><button data-a="impno" class="ghost">やめる</button></div></div>`}
 function shFallback(t){const x=$("shin");if(x){x.value=t;x.focus();x.select()}}
 function cpy(t,msg){const m=$("shmsg"),ok=()=>{if(m)m.textContent=msg},ng=()=>{if(m)m.textContent="自動でコピーできませんでした。上の入力欄に表示したので、全選択してコピーしてください";shFallback(t)};
@@ -338,14 +369,14 @@ function shAct(a){const m=t=>{const e=$("shmsg");if(e)e.textContent=t};
   if(a==="shread"){shRead($("shin").value).then(()=>m("読み取りました。内容を確認して、取り込み方を選んでください")).catch(e=>{IMP=null;renderImp();m("読み取れませんでした: "+e.message)});return}
   if(a==="impno"){IMP=null;armedImp=false;renderImp();return}
   if(a==="impnew"&&IMP){const I=IMP,id=Date.now();S.stores.push({id,name:I.name,wage:I.wage,daily:I.daily,dv:I.dv,emps:I.emps,pos:I.pos,skill:I.skill,od:I.od,days:{},cur:null});IMP=null;armedImp=false;switchStore(id);setTimeout(()=>m("新しい店舗として追加しました"),0);return}
-  if(a==="impover"&&IMP){if(!armedImp){armedImp=true;renderImp();return}const T=ST(),I=IMP;Object.assign(T,{wage:I.wage,daily:I.daily,dv:I.dv,emps:I.emps,pos:I.pos,skill:I.skill});if(I.od)T.od=I.od;IMP=null;armedImp=false;save();renderReg();setTimeout(()=>m("現在の店舗に取り込みました"),0)}}
+  if(a==="impover"&&IMP){if(!armedImp){armedImp=true;renderImp();return}const T=ST(),I=IMP;Object.assign(T,{wage:I.wage,daily:I.daily,emps:I.emps,pos:I.pos});if(I.od)T.od=I.od;IMP=null;armedImp=false;save();renderReg();setTimeout(()=>m("現在の店舗に取り込みました"),0)}}
 async function shBoot(){if(location.hash.indexOf("#share=")!==0)return;const h=location.hash;history.replaceState(null,"",location.pathname+location.search);
   let err="";try{await shRead(h)}catch(e){IMP=null;err=e.message}
   document.querySelector('#nav [data-n="3"]').click();
   setTimeout(()=>{const m=$("shmsg");if(m)m.textContent=err?"リンクの内容を読み取れませんでした: "+err:"受け取った店舗情報を読み取りました。内容を確認して、取り込み方を選んでください";const b=$("impbox");if(b&&!err)b.scrollIntoView({block:"center"})},50)}
 cur=ST().cur;fillStores();init();renderReg();shBoot();window.addEventListener("hashchange",shBoot);
 odCallback().then(ok=>{if(ok&&localStorage.getItem("od-go")){localStorage.removeItem("od-go");odLoad()}});
-if(typeof XLSX==="undefined")$("msg").textContent="Excel読込ライブラリを取得できていません(ネット接続を確認)";
+if(typeof XLSX==="undefined")msg("Excel読込ライブラリを取得できていません(ネット接続を確認)");
 </script>
 <script>
 (function(){
