@@ -114,10 +114,12 @@ summary{font-size:14px}
 <div class="card inp"><div class="row">予約 <input id="g" type="number" class="t" placeholder="組" inputmode="numeric">組 <input id="pp" type="number" class="t" placeholder="名" inputmode="numeric">名 売上 <input id="tg" type="number" style="flex:1 1 90px" placeholder="円" inputmode="numeric"></div>
 <div class="row"><input id="nt" style="flex:1" placeholder="備考(任意)"></div></div>
 <details id="lf"><summary id="lfs">着地予想（中間報告）</summary>
+<div class="row">中間売上 <input id="lfm" type="number" inputmode="numeric" style="flex:1 1 90px" placeholder="円">円</div>
 <div class="row">着地売上予想 <input id="lfv" type="number" inputmode="numeric" style="flex:1 1 90px" placeholder="円">円</div>
 <div class="row">現在の人件費率 <input id="lfn" type="number" step="0.1" inputmode="decimal" class="t" placeholder="自動">% 　着地の目標 <input id="lft" type="number" step="0.1" inputmode="decimal" class="t">%</div>
 <small>現在の人件費率は空欄なら「今の人員の人件費 ÷ 着地売上予想」で自動計算します。休憩での早上げなどは、上の時間を直すと反映されます。</small>
-<div id="lfr" class="lfr"></div></details>
+<div id="lfr" class="lfr"></div>
+<h3 style="margin-top:12px">中間報告の出力</h3><pre id="lfo"></pre><div class="row"><button id="lfc">コピー</button></div></details>
 <h3>出力</h3><pre id="out"></pre>
 <div class="row"><button id="cp">コピー</button><small id="lb"></small></div>
 </main>
@@ -198,7 +200,7 @@ function readSheet(name){const ws=WB.Sheets[name],a=XLSX.utils.sheet_to_json(ws,
 const rk=rows=>JSON.stringify(rows.map(r=>[r.n,r.s,r.e]).sort());
 function touched(E){let o;try{o=JSON.parse(E.orig)}catch(e){return true}
   return rk(E.rows)!==rk(o.rows)||(+E.tg||0)!==(+o.tg||0)||E.rows.some(r=>(r.ps&&r.ps.length)||r.x)||!!(E.del&&E.del.length)||
-    !!(E.g||E.pp||E.nt||E.hol||E.lf||E.cr||E.tr)||Object.keys(E.ov||{}).length>0}
+    !!(E.g||E.pp||E.nt||E.hol||E.ms||E.lf||E.cr||E.tr)||Object.keys(E.ov||{}).length>0}
 function mergeDays(nd){const T=ST(),old=T.days||{},mons=new Set(Object.keys(nd).map(k=>k.split("/")[0])),o={},kept=[],xl=[];
   Object.keys(old).forEach(k=>{if(mons.has(k.split("/")[0]))o[k]=old[k]});
   Object.keys(nd).forEach(k=>{const E=o[k];
@@ -229,7 +231,7 @@ function draw(){const D=DY()[cur];
   $("dn").textContent=D.del.length?`(${D.del.length})`:"";
   $("del").innerHTML=D.del.map((r,i)=>`<div class="drow"><span>${esc(r.n)||"（名前未入力）"} ${num(r.s)}-${num(r.e)} ${esc(posTxt(r))}</span><button class="ghost" data-res="${i}">戻す</button></div>`).join("")||"<small>なし</small>";
   $("g").value=D.g;$("pp").value=D.pp;$("tg").value=D.tg;$("nt").value=D.nt;
-  $("lfv").value=D.lf==null?"":D.lf;$("lfn").value=D.cr==null?"":D.cr;$("lft").value=D.tr!=null&&D.tr!==""?D.tr:(ST().tr==null?"":ST().tr);out()}
+  $("lfm").value=D.ms==null?"":D.ms;$("lfv").value=D.lf==null?"":D.lf;$("lfn").value=D.cr==null?"":D.cr;$("lft").value=D.tr!=null&&D.tr!==""?D.tr:(ST().tr==null?"":ST().tr);out()}
 function out(){const T=ST(),D=DY()[cur];if(!D)return;
   const rows=[...D.rows].sort((x,y)=>x.s-y.s),nw=Math.max(8,...rows.map(r=>wid(r.n)))+2,wage=+T.wage||0;
   let h=0,labor=+T.daily||0;const L=[`${cur}(${D.wd})  ${T.name}`];
@@ -241,8 +243,6 @@ function out(){const T=ST(),D=DY()[cur];if(!D)return;
   const t=[];if(D.tg)t.push(Math.round(labor/D.tg*100)+"%");if(D.nt)t.push(D.nt);
   if(t.length)L.push(t.join("   "));
   const F=lfInfo(labor,D,wage);lfRender(F);
-  if(F.lf){const u=[ "着地 "+num(+(F.lf/1e4).toFixed(1))+"万",Math.round(F.cr)+"%"];
-    if(F.tr!=null&&F.diff>0&&F.hours!=null)u.push("(目標"+num(F.tr)+"%まで あと"+num(F.hours)+"H削減)");L.push(u.join("  "))}
   $("out").textContent=L.join("\n");$("pos").innerHTML=board(rows,D);
   $("lb").textContent="人件費 "+Math.round(labor).toLocaleString()+"円"}
 const nn=v=>v===""||v==null||isNaN(+v)?null:+v;
@@ -250,7 +250,12 @@ function lfInfo(labor,D,wage){const lf=nn(D.lf)||0,T=ST(),auto=lf?labor/lf*100:n
   const F={lf,labor,auto,cr,tr};
   if(lf&&cr!=null){F.lab=lf*cr/100;if(tr!=null){F.diff=(cr-tr)/100*lf;F.hours=wage>0?Math.ceil(Math.abs(F.diff)/wage*10)/10:null;F.wage=wage}}
   return F}
-function lfRender(F){const box=$("lfr"),yen=x=>Math.round(x).toLocaleString()+"円";
+function lfReport(F,D){const T=ST(),m=x=>num(+(x/1e4).toFixed(1))+"万",p=x=>num(+x.toFixed(1))+"%",a=[];
+  if(nn(D.ms))a.push(T.name+"中間"+m(+D.ms));else a.push(T.name+"中間");
+  if(F.lf)a.push("着地予想"+m(F.lf));
+  const L=[a.join("　")];if(F.lf&&F.cr!=null)L.push("人件費予測"+p(F.cr));if(F.tr!=null)L.push("人件費目標"+p(F.tr));
+  $("lfo").textContent=L.join("\n")}
+function lfRender(F){lfReport(F,DY()[cur]||{});const box=$("lfr"),yen=x=>Math.round(x).toLocaleString()+"円";
   $("lfn").placeholder=F.auto==null?"自動":F.auto.toFixed(1)+"(自動)";
   if(!F.lf){box.innerHTML="<small>着地売上予想を入れると、着地の人件費と必要な削減時間が出ます</small>";$("lfs").textContent="着地予想（中間報告）";return}
   let h=`着地の人件費予想 <b>${yen(F.lab)}</b>(${F.cr.toFixed(1)}%)`,sm="着地予想・"+F.cr.toFixed(1)+"%";
@@ -335,8 +340,9 @@ $("add").onclick=()=>{const D=DY()[cur];if(!D)return;const r={n:"",s:17,e:22,ps:
 $("v3").addEventListener("toggle",e=>{const i=e.target.dataset&&e.target.dataset.di;if(i!==undefined){if(e.target.open)REGOPEN.add(+i);else REGOPEN.delete(+i)}},true);
 [["g","g"],["pp","pp"],["tg","tg"],["nt","nt"]].forEach(([i,k])=>$(i).oninput=e=>{const D=DY()[cur];if(!D)return;
   D[k]=k==="nt"?e.target.value:(e.target.value===""?"":+e.target.value);save();out()});
-[["lfv","lf"],["lfn","cr"],["lft","tr"]].forEach(([i,k])=>$(i).oninput=e=>{const D=DY()[cur];if(!D)return;
+[["lfm","ms"],["lfv","lf"],["lfn","cr"],["lft","tr"]].forEach(([i,k])=>$(i).oninput=e=>{const D=DY()[cur];if(!D)return;
   const v=e.target.value;D[k]=v===""?"":+v;if(k==="tr")ST().tr=D[k];save();out()});
+$("lfc").onclick=()=>{const b=$("lfc");navigator.clipboard.writeText($("lfo").textContent).then(()=>{b.textContent="コピーしました";setTimeout(()=>b.textContent="コピー",1500)}).catch(()=>{b.textContent="コピーできませんでした"})};
 $("hol").onchange=e=>{const D=DY()[cur];if(!D)return;D.hol=e.target.checked;save();draw()};
 $("rst").onclick=()=>{const D=DY()[cur];if(!D||!D.orig)return;const o=JSON.parse(D.orig);D.rows=o.rows;D.tg=o.tg;D.del=[];D.ov={};OPEN=null;save();draw()};
 $("cp").onclick=()=>{const b=$("cp");navigator.clipboard.writeText($("out").textContent).then(()=>{b.textContent="コピーしました";setTimeout(()=>b.textContent="コピー",1500)}).catch(()=>{b.textContent="コピーできませんでした"})};
