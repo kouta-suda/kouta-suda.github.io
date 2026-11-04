@@ -93,6 +93,8 @@ summary{font-size:14px}
 .empty{padding:14px;text-align:center;color:var(--mut)}
 .drow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0}
 .inp{padding:6px 12px}
+.lfr{margin-top:8px;line-height:1.7}.lfr b{font-size:17px}.lfr .need{font-weight:800;color:var(--lofg)}.lfr .okk{font-weight:800;color:var(--okfg)}
+.mh{display:block;color:var(--mut);margin:-2px 0 8px 2px}
 </style></head>
 <body>
 <div id="gate"><div class="gbox"><h2>シフト作成</h2><p>4桁の番号を入力してください</p><input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" aria-label="4桁の番号"><button id="pinbtn">開く</button><small id="pinmsg"></small></div></div>
@@ -111,6 +113,11 @@ summary{font-size:14px}
 <details id="dd"><summary>削除した人 <span id="dn"></span></summary><div id="del"></div><div class="row"><button id="rst" class="ghost">この日をExcelの内容に戻す</button></div></details>
 <div class="card inp"><div class="row">予約 <input id="g" type="number" class="t" placeholder="組" inputmode="numeric">組 <input id="pp" type="number" class="t" placeholder="名" inputmode="numeric">名 売上 <input id="tg" type="number" style="flex:1 1 90px" placeholder="円" inputmode="numeric"></div>
 <div class="row"><input id="nt" style="flex:1" placeholder="備考(任意)"></div></div>
+<details id="lf"><summary id="lfs">着地予想（中間報告）</summary>
+<div class="row">着地売上予想 <input id="lfv" type="number" inputmode="numeric" style="flex:1 1 90px" placeholder="円">円</div>
+<div class="row">現在の人件費率 <input id="lfn" type="number" step="0.1" inputmode="decimal" class="t" placeholder="自動">% 　着地の目標 <input id="lft" type="number" step="0.1" inputmode="decimal" class="t">%</div>
+<small>現在の人件費率は空欄なら「今の人員の人件費 ÷ 着地売上予想」で自動計算します。休憩での早上げなどは、上の時間を直すと反映されます。</small>
+<div id="lfr" class="lfr"></div></details>
 <h3>出力</h3><pre id="out"></pre>
 <div class="row"><button id="cp">コピー</button><small id="lb"></small></div>
 </main>
@@ -172,23 +179,42 @@ function toggleRow(k){const D=DY()[cur];if(!D)return;OPEN=OPEN===k?null:k;sortRo
 const msg=t=>{$("msg").textContent=t;$("ld").open=true};
 const nz=s=>(s||"").normalize("NFKC").replace(/\s+/g,"");
 function load(buf){WB=XLSX.read(buf,{type:"array",cellDates:true});pick()}
-function pick(){const N=WB.SheetNames,m=$("mm").value,hf=$("hf").value,sh=$("sh"),sn=nz(ST().name);
-  const c=N.filter(n=>new RegExp("(^|\\D)"+m+"月"+hf).test(nz(n)));
-  const mine=c.filter(n=>sn&&nz(n).includes(sn)),plain=c.filter(n=>new RegExp("^"+m+"月"+hf).test(nz(n)));
-  const use=mine.length?mine:plain;
+function sheetFor(m,hf){const N=WB.SheetNames,sn=nz(ST().name),c=N.filter(n=>new RegExp("(^|\\D)"+m+"月"+hf).test(nz(n))),
+  mine=c.filter(n=>sn&&nz(n).includes(sn)),plain=c.filter(n=>new RegExp("^"+m+"月"+hf).test(nz(n)));return{c,use:mine.length?mine:plain}}
+function pick(){const N=WB.SheetNames,m=$("mm").value,hf=$("hf").value,oh=hf==="前半"?"後半":"前半",sh=$("sh"),A=sheetFor(m,hf),B=sheetFor(m,oh);
   sh.innerHTML=N.map(n=>`<option>${n}</option>`).join("");sh.style.display=N.length>1?"":"none";
-  if(use.length){sh.value=use[0];parse();if(use.length>1)msg($("msg").textContent+"(同じ名前に当てはまるシートが"+use.length+"枚あります。上の選択で切り替えられます)")}
-  else if(c.length){sh.value=c[0];msg("「"+m+"月"+hf+"」に当てはまるシートは、別の名前が付いたものだけでした("+c.join("、")+")。この店舗のシートか確認して、上の選択から選んでください")}
+  if(A.use.length){sh.value=A.use[0];parse(B.use.length?[A.use[0],B.use[0]]:[A.use[0]]);if(A.use.length>1)msg($("msg").textContent+"(同じ名前に当てはまるシートが"+A.use.length+"枚あります。上の選択で切り替えられます)")}
+  else if(A.c.length){sh.value=A.c[0];msg("「"+m+"月"+hf+"」に当てはまるシートは、別の名前が付いたものだけでした("+A.c.join("、")+")。この店舗のシートか確認して、上の選択から選んでください")}
   else{msg("「"+m+"月"+hf+"」に当てはまるシートがありません。上の選択から直接選べます")}}
-function parse(){const ws=WB.Sheets[$("sh").value],a=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null}),days={};
+let PREFTODAY=true;
+function readSheet(name){const ws=WB.Sheets[name],a=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null}),days={};
   (a[0]||[]).forEach((v,c)=>{if(!(v instanceof Date))return;
     const d=new Date(v.getTime()+12*36e5),k=(d.getUTCMonth()+1)+"/"+d.getUTCDate(),rows=[];
     for(let r=8;r<a.length;r++){const n=a[r][1],s=a[r][c],e=a[r][c+1];
       if(!n||n==="ホール"||n==="キッチン"||typeof s!=="number"||typeof e!=="number")continue;rows.push({n:String(n).trim(),s,e,ps:[],x:""})}
     rows.sort((x,y)=>x.s-y.s);const tg=parseInt(String(a[2]&&a[2][c]||"").replace(/,/g,""))||"";
     days[k]={wd:WD[d.getUTCDay()],rows,g:"",pp:"",tg,nt:"",orig:JSON.stringify({rows,tg})}});
-  if(!Object.keys(days).length){msg("「"+$("sh").value+"」に日付の行が見つかりません");return}
-  ST().days=days;ST().src=$("sh").value;OPEN=null;setCur(Object.keys(days)[0]);save();$("msg").textContent=$("sh").value+": "+Object.keys(days).length+"日分を読み込みました";init()}
+  return Object.keys(days).length?days:null}
+const rk=rows=>JSON.stringify(rows.map(r=>[r.n,r.s,r.e]).sort());
+function touched(E){let o;try{o=JSON.parse(E.orig)}catch(e){return true}
+  return rk(E.rows)!==rk(o.rows)||(+E.tg||0)!==(+o.tg||0)||E.rows.some(r=>(r.ps&&r.ps.length)||r.x)||!!(E.del&&E.del.length)||
+    !!(E.g||E.pp||E.nt||E.hol||E.lf||E.cr||E.tr)||Object.keys(E.ov||{}).length>0}
+function mergeDays(nd){const T=ST(),old=T.days||{},mons=new Set(Object.keys(nd).map(k=>k.split("/")[0])),o={},kept=[],xl=[];
+  Object.keys(old).forEach(k=>{if(mons.has(k.split("/")[0]))o[k]=old[k]});
+  Object.keys(nd).forEach(k=>{const E=o[k];
+    if(E&&touched(E)){kept.push(k);if(E.orig!==nd[k].orig){xl.push(k);E.orig=nd[k].orig}}else o[k]=nd[k]});
+  const ks=Object.keys(o).sort((a,b)=>{const[x,y]=a.split("/").map(Number),[p,q]=b.split("/").map(Number);return x-p||y-q});
+  T.days=Object.fromEntries(ks.map(k=>[k,o[k]]));return{kept,xl}}
+function parse(names){const nd={};let fk=null,ok=false;
+  names.forEach(n=>{const d=readSheet(n);if(!d)return;ok=true;if(fk===null)fk=Object.keys(d)[0];Object.assign(nd,d)});
+  if(!ok){msg("「"+names[0]+"」に日付の行が見つかりません");return}
+  const T=ST(),src=names.join("・"),newSrc=T.src!==src,r=mergeDays(nd),now=new Date(),today=(now.getMonth()+1)+"/"+now.getDate();
+  T.src=src;OPEN=null;
+  if(PREFTODAY&&T.days[today])setCur(today);else if(!cur||!T.days[cur]||newSrc)setCur(fk);
+  PREFTODAY=false;save();
+  $("msg").textContent=src+": "+Object.keys(T.days).length+"日分を読み込みました"+(r.kept.length?"。編集済みの"+r.kept.length+"日分は、保存した内容のままにしています":"");
+  init();
+  if(r.xl.length)msg($("msg").textContent+"。Excel側も変わっていた日: "+r.xl.slice(0,6).join("、")+(r.xl.length>6?"など":"")+"(その日の「削除した人」の中の「Excelの内容に戻す」で最新を反映できます)")}
 function fillStores(){const o=S.stores.map(s=>`<option value="${s.id}" ${s.id===S.cs?"selected":""}>${s.name}</option>`).join("");
   $("st").innerHTML=o;if($("rs"))$("rs").innerHTML=o;$("sn").textContent=ST().name}
 function switchStore(id){S.cs=id;cur=ST().cur;save();fillStores();init();renderReg()}
@@ -202,7 +228,8 @@ function draw(){const D=DY()[cur];
   $("rows").innerHTML=D.rows.map(rowHTML).join("")||'<div class="empty">人員がいません。「＋ 人を追加」で入れてください</div>';
   $("dn").textContent=D.del.length?`(${D.del.length})`:"";
   $("del").innerHTML=D.del.map((r,i)=>`<div class="drow"><span>${esc(r.n)||"（名前未入力）"} ${num(r.s)}-${num(r.e)} ${esc(posTxt(r))}</span><button class="ghost" data-res="${i}">戻す</button></div>`).join("")||"<small>なし</small>";
-  $("g").value=D.g;$("pp").value=D.pp;$("tg").value=D.tg;$("nt").value=D.nt;out()}
+  $("g").value=D.g;$("pp").value=D.pp;$("tg").value=D.tg;$("nt").value=D.nt;
+  $("lfv").value=D.lf==null?"":D.lf;$("lfn").value=D.cr==null?"":D.cr;$("lft").value=D.tr!=null&&D.tr!==""?D.tr:(ST().tr==null?"":ST().tr);out()}
 function out(){const T=ST(),D=DY()[cur];if(!D)return;
   const rows=[...D.rows].sort((x,y)=>x.s-y.s),nw=Math.max(8,...rows.map(r=>wid(r.n)))+2,wage=+T.wage||0;
   let h=0,labor=+T.daily||0;const L=[`${cur}(${D.wd})  ${T.name}`];
@@ -213,8 +240,33 @@ function out(){const T=ST(),D=DY()[cur];if(!D)return;
   L.push(m.join("  "));
   const t=[];if(D.tg)t.push(Math.round(labor/D.tg*100)+"%");if(D.nt)t.push(D.nt);
   if(t.length)L.push(t.join("   "));
+  const F=lfInfo(labor,D,wage);lfRender(F);
+  if(F.lf){const u=[ "着地 "+num(+(F.lf/1e4).toFixed(1))+"万",Math.round(F.cr)+"%"];
+    if(F.tr!=null&&F.diff>0&&F.hours!=null)u.push("(目標"+num(F.tr)+"%まで あと"+num(F.hours)+"H削減)");L.push(u.join("  "))}
   $("out").textContent=L.join("\n");$("pos").innerHTML=board(rows,D);
   $("lb").textContent="人件費 "+Math.round(labor).toLocaleString()+"円"}
+const nn=v=>v===""||v==null||isNaN(+v)?null:+v;
+function lfInfo(labor,D,wage){const lf=nn(D.lf)||0,T=ST(),auto=lf?labor/lf*100:null,cr=nn(D.cr)!=null?nn(D.cr):auto,tr=nn(D.tr)!=null?nn(D.tr):nn(T.tr);
+  const F={lf,labor,auto,cr,tr};
+  if(lf&&cr!=null){F.lab=lf*cr/100;if(tr!=null){F.diff=(cr-tr)/100*lf;F.hours=wage>0?Math.ceil(Math.abs(F.diff)/wage*10)/10:null;F.wage=wage}}
+  return F}
+function lfRender(F){const box=$("lfr"),yen=x=>Math.round(x).toLocaleString()+"円";
+  $("lfn").placeholder=F.auto==null?"自動":F.auto.toFixed(1)+"(自動)";
+  if(!F.lf){box.innerHTML="<small>着地売上予想を入れると、着地の人件費と必要な削減時間が出ます</small>";$("lfs").textContent="着地予想（中間報告）";return}
+  let h=`着地の人件費予想 <b>${yen(F.lab)}</b>(${F.cr.toFixed(1)}%)`,sm="着地予想・"+F.cr.toFixed(1)+"%";
+  if(F.tr!=null){h+=`<br>目標 ${F.tr}% = ${yen(F.lf*F.tr/100)}`;
+    if(F.diff>0){h+=`<br><span class="need">あと ${F.hours==null?"?":num(F.hours)}H の削減が必要</span>(約${yen(F.diff)}分${F.hours==null?"。時給が未登録です":"・時給"+F.wage+"円で計算"})`;sm+=" あと"+(F.hours==null?"?":num(F.hours))+"H削減"}
+    else{h+=`<br><span class="okk">目標以内です</span>(あと${yen(-F.diff)}${F.hours==null?"":"・約"+num(F.hours)+"H分"}の余裕)`;sm+=" 目標以内"}}
+  else h+="<br><small>着地の目標%を入れると、必要な削減時間が出ます</small>";
+  box.innerHTML=h;$("lfs").textContent=sm}
+function monthStats(){const T=ST(),k=Object.keys(T.days||{});if(!k.length)return null;
+  const m=+(T.days[cur]?cur:k[0]).split("/")[0],now=new Date(),tm=now.getMonth()+1,td=now.getDate(),H={};
+  k.forEach(key=>{const[mo,d]=key.split("/").map(Number);if(mo!==m)return;
+    T.days[key].rows.forEach(r=>{const w=r.e-r.s;if(!(w>0))return;const o=H[r.n]||(H[r.n]={tot:0,upto:0});o.tot+=w;if(mo<tm||(mo===tm&&d<=td))o.upto+=w})});
+  return{m,now:m===tm,H}}
+function mhText(n,M){if(!M)return"シフトを読み込むと、月の累計時間が出ます";const o=M.H[n]||{tot:0,upto:0},f=x=>num(+x.toFixed(1))+"H";
+  return M.m+"月の累計 "+f(o.tot)+(M.now?"(今日まで "+f(o.upto)+")":"")}
+function refreshMh(){const M=monthStats();document.querySelectorAll("[data-mh]").forEach(e=>{const i=+e.dataset.mh,q=ST().emps[i];e.textContent=q&&q.n?mhText(q.n,M):""})}
 function renderReg(){const T=ST(),pn=T.pos.filter(p=>p.role==="parent"&&p.n).map(p=>p.n),
   inp=(b,v,ty,ex)=>`<input data-b="${b}" ${ty?`data-t="${ty}"`:""} value="${esc(v)}" ${ex||""}>`,
   roles={normal:"通常",parent:"親(子の人数をまとめる)",child:"子"};
@@ -223,7 +275,7 @@ function renderReg(){const T=ST(),pn=T.pos.filter(p=>p.role==="parent"&&p.n).map
   <div class="row">時給 ${inp("wage",T.wage,"n","type=number style='width:90px'")}円 毎日の固定人件費 ${inp("daily",T.daily,"n","type=number style='width:90px'")}円</div>
   <div class="row">OneDriveのファイル ${inp("od",T.od,"","style='flex:1' placeholder='共有リンク、または /フォルダ/ファイル名.xlsx'")}</div>
   <div class="row"><button data-a="delst" class="ghost" ${S.stores.length<2?"disabled":""}>${armed?"本当に削除する":"この店舗を削除"}</button></div></div>
-  <h3>社員(シフトインした日に発生)</h3><div class="card">${T.emps.map((e,i)=>`<div class="row">${inp(`emps.${i}.n`,e.n,"","style='flex:1' placeholder='名前'")}${inp(`emps.${i}.v`,e.v,"n","type=number style='width:90px'")}円<button data-a="delemp" data-i="${i}" class="del">×</button></div>`).join("")}<button data-a="addemp">＋社員追加</button></div>
+  <h3>社員(シフトインした日に発生)</h3><div class="card"><small>累計は、読み込んだ月の全日(前半・後半)のシフト時間の合計です。削除した人は含みません。</small>${T.emps.map((e,i)=>`<div class="row">${inp(`emps.${i}.n`,e.n,"","style='flex:1' placeholder='名前'")}${inp(`emps.${i}.v`,e.v,"n","type=number style='width:90px'")}円<button data-a="delemp" data-i="${i}" class="del">×</button></div><small class="mh" data-mh="${i}"></small>`).join("")}<button data-a="addemp">＋社員追加</button></div>
   <h3>ポジション・定数（人数）</h3><small>定数は人数です。範囲は「1-2」のように書きます。空欄=その曜日は使わない、0=人数の目安なし。</small>
   ${T.pos.map((p,i)=>`<div class="card"><div class="row">${inp(`pos.${i}.n`,p.n,"","style='flex:1' placeholder='名前'")}<button data-a="up" data-i="${i}" class="ghost">↑</button><button data-a="delpos" data-i="${i}" class="del">×</button></div>
   <div class="row">定数　平日${inp(`pos.${i}.cwk`,cnt(p,"wk"),"s","class=t placeholder=－")}金日祝${inp(`pos.${i}.cfs`,cnt(p,"fs"),"s","class=t placeholder=－")}土${inp(`pos.${i}.csat`,cnt(p,"sat"),"s","class=t placeholder=－")}</div>
@@ -243,10 +295,11 @@ function renderReg(){const T=ST(),pn=T.pos.filter(p=>p.role==="parent"&&p.n).map
   <div class="row"><button data-a="shread">読み取る</button></div>
   <div id="impbox"></div></div>
   <details><summary>OneDrive連携の詳細</summary><div class="row">クライアントID <input data-g="cid" value="${esc(S.cid||"")}" style="flex:1" placeholder="空欄でOK（ファイルに設定済み）" autocomplete="off"></div>
-  <small>登録時に指定するリダイレクトURI: ${redir()}</small><div class="row"><button data-a="odout" class="ghost">Microsoftからログアウト</button></div></details>`;shRefresh();renderImp()}
+  <div class="row"><label><input type="checkbox" data-g2="auto" ${S.auto===false?"":"checked"}> 起動時にOneDriveを自動で読み込む</label></div>
+  <small>登録時に指定するリダイレクトURI: ${redir()}</small><div class="row"><button data-a="odout" class="ghost">Microsoftからログアウト</button></div></details>`;refreshMh();shRefresh();renderImp()}
 $("v3").oninput=e=>{const t=e.target,b=t.dataset.b;if(t.dataset.g){S[t.dataset.g]=t.value.trim();save();return}if(!b)return;let v=t.value;if(t.dataset.t==="n")v=+v||0;if(t.dataset.t==="z")v=v===""?null:+v;if(t.dataset.t==="s")v=v.trim();
-  setP(ST(),b,v);save();if(b==="name")fillStores();shRefresh()};
-$("v3").onchange=e=>{if(e.target.dataset.rr)renderReg();if(e.target.id==="rs")switchStore(+e.target.value);if(e.target.id==="shod")shRefresh()};
+  setP(ST(),b,v);save();if(b==="name")fillStores();if(/^emps\.\d+\.n$/.test(b))refreshMh();shRefresh()};
+$("v3").onchange=e=>{if(e.target.dataset.rr)renderReg();if(e.target.id==="rs")switchStore(+e.target.value);if(e.target.id==="shod")shRefresh();if(e.target.dataset.g2){S.auto=e.target.checked;save()}};
 $("v3").onclick=e=>{const d=e.target.dataset,a=d.a,T=ST();if(!a)return;if(a!=="delst")armed=false;if(a.indexOf("sh")===0||a.indexOf("imp")===0){shAct(a);return}
   if(a==="addst"){const n=JSON.parse(JSON.stringify(T));n.id=Date.now();n.name=T.name+"(コピー)";n.days={};n.skill={};n.cur=null;S.stores.push(n);switchStore(n.id);return}
   if(a==="delst"){if(S.stores.length<2)return;if(!armed){armed=true;renderReg();return}armed=false;S.stores=S.stores.filter(s=>s.id!==T.id);switchStore(S.stores[0].id);return}
@@ -261,7 +314,7 @@ $("nav").onclick=e=>{const b=e.target.closest("button");if(!b)return;const n=b.d
 $("f").onchange=async e=>{const f=e.target.files[0];if(!f)return;
   if(typeof XLSX==="undefined"){msg("Excel読込ライブラリを取得できていません。ネット接続とブラウザを確認してください");return}
   try{load(await f.arrayBuffer())}catch(x){msg("読み込みに失敗しました: "+x.message)}};
-$("sh").onchange=parse;$("st").onchange=e=>switchStore(+e.target.value);
+$("sh").onchange=()=>parse([$("sh").value]);$("st").onchange=e=>switchStore(+e.target.value);
 const rowOf=k=>{const D=DY()[cur];return D&&D.rows.find(r=>r.k===k)};
 $("d").onchange=e=>{const o=DY()[cur];if(o)sortRows(o);setCur(e.target.value);OPEN=null;save();draw()};
 $("rows").oninput=e=>{const t=e.target,f=t.dataset.f;if(!f)return;const r=rowOf(t.dataset.r);if(!r)return;
@@ -282,6 +335,8 @@ $("add").onclick=()=>{const D=DY()[cur];if(!D)return;const r={n:"",s:17,e:22,ps:
 $("v3").addEventListener("toggle",e=>{const i=e.target.dataset&&e.target.dataset.di;if(i!==undefined){if(e.target.open)REGOPEN.add(+i);else REGOPEN.delete(+i)}},true);
 [["g","g"],["pp","pp"],["tg","tg"],["nt","nt"]].forEach(([i,k])=>$(i).oninput=e=>{const D=DY()[cur];if(!D)return;
   D[k]=k==="nt"?e.target.value:(e.target.value===""?"":+e.target.value);save();out()});
+[["lfv","lf"],["lfn","cr"],["lft","tr"]].forEach(([i,k])=>$(i).oninput=e=>{const D=DY()[cur];if(!D)return;
+  const v=e.target.value;D[k]=v===""?"":+v;if(k==="tr")ST().tr=D[k];save();out()});
 $("hol").onchange=e=>{const D=DY()[cur];if(!D)return;D.hol=e.target.checked;save();draw()};
 $("rst").onclick=()=>{const D=DY()[cur];if(!D||!D.orig)return;const o=JSON.parse(D.orig);D.rows=o.rows;D.tg=o.tg;D.del=[];D.ov={};OPEN=null;save();draw()};
 $("cp").onclick=()=>{const b=$("cp");navigator.clipboard.writeText($("out").textContent).then(()=>{b.textContent="コピーしました";setTimeout(()=>b.textContent="コピー",1500)}).catch(()=>{b.textContent="コピーできませんでした"})};
@@ -309,10 +364,11 @@ async function odCallback(){const q=new URLSearchParams(location.search);if(!q.g
 function odBase(loc){loc=loc.trim();
   if(/^https?:/i.test(loc))return "https://graph.microsoft.com/v1.0/shares/u!"+btoa(unescape(encodeURIComponent(loc))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")+"/driveItem";
   return "https://graph.microsoft.com/v1.0/me/drive/root:"+("/"+loc.replace(/^\/+/,"")).split("/").map(encodeURIComponent).join("/")+":"}
-async function odLoad(){const T=ST();
+async function odLoad(auto){const T=ST();
+  if(auto&&(!T.od||!cid()||typeof XLSX==="undefined"))return;
   if(!cid()){msg("登録情報の「OneDrive連携」に、クライアントIDを入力してください");return}
   if(!T.od){msg("登録情報の店舗欄に、OneDriveのファイル(共有リンクかパス)を入力してください");return}
-  const sc=odSc(T.od),tk=await odToken(sc);if(!tk){msg("Microsoftのログイン画面に移動します…");setTimeout(()=>odLogin(sc),400);return}
+  const sc=odSc(T.od),tk=await odToken(sc);if(!tk){if(auto){msg("OneDriveのログインが切れています。「OneDriveから読み込む」を押してください");return}msg("Microsoftのログイン画面に移動します…");setTimeout(()=>odLogin(sc),400);return}
   msg("OneDriveから読み込み中…");
   const base=odBase(T.od),H={Authorization:"Bearer "+tk};
   try{let buf;
@@ -375,7 +431,8 @@ async function shBoot(){if(location.hash.indexOf("#share=")!==0)return;const h=l
   document.querySelector('#nav [data-n="3"]').click();
   setTimeout(()=>{const m=$("shmsg");if(m)m.textContent=err?"リンクの内容を読み取れませんでした: "+err:"受け取った店舗情報を読み取りました。内容を確認して、取り込み方を選んでください";const b=$("impbox");if(b&&!err)b.scrollIntoView({block:"center"})},50)}
 cur=ST().cur;fillStores();init();renderReg();shBoot();window.addEventListener("hashchange",shBoot);
-odCallback().then(ok=>{if(ok&&localStorage.getItem("od-go")){localStorage.removeItem("od-go");odLoad()}});
+const HADCB=/[?&](code|error)=/.test(location.search);
+odCallback().then(ok=>{if(ok&&localStorage.getItem("od-go")){localStorage.removeItem("od-go");odLoad()}else if(!HADCB&&S.auto!==false)odLoad(true)});
 if(typeof XLSX==="undefined")msg("Excel読込ライブラリを取得できていません(ネット接続を確認)");
 </script>
 <script>
