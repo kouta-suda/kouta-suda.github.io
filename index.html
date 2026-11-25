@@ -1,7 +1,38 @@
 <!DOCTYPE html>
 <html lang="ja"><head><meta charset="utf-8">
+<!-- (↑文字コードの指定 charset は、ファイルの先頭1KB以内に置く決まり。この長い説明より上にあるのはそのため) -->
+
+<!--
+  ============================================================
+  シフト作成アプリ(1ファイル完結)
+  ============================================================
+  ■ このファイルの構成(上から順)
+    1. head        : タイトル・PWA設定・ログイン状態の先読み
+    2. style       : 見た目(CSS)            ← 色・余白を変えたいときはここ
+    3. body        : 画面の部品(HTML)       ← 入力欄やボタンを増やすときはここ
+    4. script      : 動作(JavaScript)       ← 計算・出力の形を変えたいときはここ
+         S1 基本の道具 / S2 ポジション / S3 休憩と時間 / S4 人の行の表示
+         S5 Excel読込 / S6 画面の描画と出力 / S7 着地予想 / S8 月の累計
+         S9 登録画面 / S10 画面のイベント / S11 OneDrive / S12 店舗情報の共有
+         S13 起動処理
+    5. 最後の script : 4桁の番号による簡易ロック、サービスワーカー登録
+
+  ■ コメントの書き方(HTMLにもコメントは書ける)
+    HTML       : 山括弧の中を「!--」で始め「--」で終える囲み(いま読んでいるこの形)。
+                 ※中に、閉じる記号(ハイフン2つと山括弧)を書くとそこで終わってしまうので注意
+    CSS        : スラッシュとアスタリスクで囲む(この形は style の中で使っている)
+    JavaScript : 行の途中から // 以降、または /* と */ で囲む(複数行可)
+
+  ■ よく触る場所の目印(検索用)
+    出力の形(シフト)   → 「function out」
+    出力の形(中間報告) → 「function lfReport」
+    休憩の扱い         → 「S3」
+    暗証番号           → 最後の script の H(ハッシュ値)
+-->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>シフト作成</title>
+
+<!-- ホーム画面に追加したときにアプリとして動かすための設定(PWA) -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="theme-color" content="#4f46e5">
@@ -9,451 +40,1558 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="シフト">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+<!-- ログイン(4桁の番号)の状態を、画面が描かれる前に調べる。
+     有効期限(1時間)内でなければ html に "locked" を付けて、番号入力画面だけを出す -->
 <script>
-const AUTH_KEY="shift-auth",AUTH_MS=3600000;let EXP=0;
-const okSession=()=>{let t=0;try{t=+localStorage.getItem(AUTH_KEY)||0}catch(e){}return Math.max(t,EXP)>Date.now()};
-if(!okSession())document.documentElement.classList.add("locked");
+const AUTH_KEY = "shift-auth";   // localStorage に保存する「ログインの期限」のキー
+const AUTH_MS  = 3600000;        // ログインを保つ時間(ミリ秒)= 1時間
+let EXP = 0;                     // メモリ上のログイン期限(localStorageが使えない時の予備)
+const okSession = () => {
+  let t = 0;
+  try { t = +localStorage.getItem(AUTH_KEY) || 0 } catch (e) {}
+  return Math.max(t, EXP) > Date.now();
+};
+if (!okSession()) document.documentElement.classList.add("locked");
 </script>
+
 <style>
-:root{--bg:#f3f5fb;--fg:#1f2937;--card:#ffffff;--ac:#4f46e5;--ac2:#0ea5e9;--bd:#e2e6f0;--mut:#6b7280;--bub:#d4f4c8;--bubfg:#14301a;--shadow:0 1px 3px rgba(30,41,90,.10);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f172a;--fg:#e8ecf5;--card:#1b2437;--ac:#818cf8;--ac2:#38bdf8;--bd:#2e3a52;--mut:#94a3b8;--bub:#1f5130;--bubfg:#e6f7e9;--shadow:0 1px 3px rgba(0,0,0,.4)}}
-:root[data-theme="dark"]{--bg:#0f172a;--fg:#e8ecf5;--card:#1b2437;--ac:#818cf8;--ac2:#38bdf8;--bd:#2e3a52;--mut:#94a3b8;--bub:#1f5130;--bubfg:#e6f7e9;--shadow:0 1px 3px rgba(0,0,0,.4)}
-html{scroll-padding-top:env(safe-area-inset-top,0px)}
-body{margin:0 auto;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,"Hiragino Sans","Noto Sans JP",sans-serif;padding:12px 12px 40px;max-width:640px}
-header{display:flex;align-items:baseline;gap:10px;margin:0 0 14px;padding:16px 18px;border-radius:18px;color:#fff;background:linear-gradient(135deg,var(--ac),var(--ac2));box-shadow:0 4px 14px rgba(79,70,229,.25)}
-header h1{margin:0;font-size:21px;letter-spacing:.04em}header span{font-size:14px;opacity:.9;background:rgba(255,255,255,.22);padding:1px 10px;border-radius:12px}
-input,select,button,textarea{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:8px 10px;min-width:0}
-input:focus,select:focus,textarea:focus{outline:2px solid var(--ac);outline-offset:0}
-button{background:linear-gradient(135deg,var(--ac),var(--ac2));color:#fff;border:0;font-weight:600;padding:8px 14px;cursor:pointer;box-shadow:var(--shadow)}
-button:active{transform:scale(.96)}
-#rst,button[data-res],[data-ovr]{background:transparent;color:var(--ac);border:1px solid var(--ac);box-shadow:none}
-button[data-del]{background:#ef4444!important;padding:6px 11px}
-#d{font-weight:700;font-size:18px}
-.row{display:flex;gap:6px;margin:6px 0;align-items:center;flex-wrap:wrap}
-.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:10px 12px;margin:8px 0;box-shadow:var(--shadow)}
-#rows .card{border-left:5px solid var(--ac2)}#rows .card.emp{border-left-color:#f59e0b}
-#rows .card .row{margin:4px 0}
-.p{flex:1 1 60px;width:60px}.t{width:64px}.n{flex:1 1 90px;width:90px}
-#pos>div{padding:3px 0;border-bottom:1px dashed var(--bd)}#pos>div:last-child{border-bottom:0}
-#pos input[type=number]{background:var(--card)}
-details{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:10px 14px;margin:8px 0;box-shadow:var(--shadow)}
-summary{cursor:pointer;font-weight:600;color:var(--ac)}
-pre{background:var(--bub);color:var(--bubfg);padding:14px 16px;border-radius:18px 18px 4px 18px;white-space:pre-wrap;overflow-x:auto;font:15px/1.6 ui-monospace,"Noto Sans Mono CJK JP",Menlo,monospace;box-shadow:var(--shadow)}
-h3{margin:24px 0 4px;font-size:15px;display:flex;align-items:center;gap:8px}
-h3::before{content:"";width:5px;height:17px;border-radius:3px;background:linear-gradient(var(--ac),var(--ac2))}
-small{color:var(--mut)}
-label{display:inline-flex;align-items:center;gap:4px}
-.chip{padding:4px 12px;font-size:14px;border-radius:16px}
-.chip.on{background:var(--ac);color:#fff;border:0}
-.chip.off{background:transparent;color:var(--fg);border:1px solid var(--bd);box-shadow:none;font-weight:400}
+/* ============================================================
+   CSS(見た目)
+   ============================================================ */
 
-main{display:none}main.on{display:block}
-body{padding-bottom:96px}
-nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--bd);padding:6px 4px;padding-bottom:calc(6px + env(safe-area-inset-bottom,0px));box-shadow:0 -2px 10px rgba(30,41,90,.08);z-index:9}
-#nav button{flex:1;background:none;color:var(--mut);box-shadow:none;border-radius:10px;font-size:11px;font-weight:600;padding:4px 2px;display:flex;flex-direction:column;align-items:center;gap:2px;line-height:1.2}
-#nav button b{font-size:20px;font-weight:400}#nav button.on{color:var(--ac);background:var(--bg)}
-.ghost{background:transparent!important;color:var(--ac);border:1px solid var(--ac);box-shadow:none}
-.del{background:#ef4444!important;padding:6px 11px}
+/* ---------- 色の定義(ここを変えると全体の配色が変わる) ---------- */
+:root {
+  --bg:#f3f5fb;      /* 背景 */
+  --fg:#1f2937;      /* 文字 */
+  --card:#ffffff;    /* カードの背景 */
+  --ac:#4f46e5;      /* 主な色(ボタンなど) */
+  --ac2:#0ea5e9;     /* 副の色(グラデーションの終点) */
+  --bd:#e2e6f0;      /* 枠線 */
+  --mut:#6b7280;     /* 薄い文字 */
+  --bub:#d4f4c8;     /* 出力欄(吹き出し)の背景 */
+  --bubfg:#14301a;   /* 出力欄の文字 */
+  --shadow:0 1px 3px rgba(30,41,90,.10);
+  /* 人数バッジの色: ok=足りている / lo=不足 / hi=多い */
+  --okfg:#15803d; --lobg:#fee2e2; --lofg:#b91c1c; --hibg:#fef3c7; --hifg:#92400e;
+  /* iPhoneのノッチ部分を避ける */
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+/* 端末がダークモードの時の配色 */
+@media (prefers-color-scheme:dark) {
+  :root:not([data-theme="light"]) {
+    --bg:#0f172a; --fg:#e8ecf5; --card:#1b2437; --ac:#818cf8; --ac2:#38bdf8; --bd:#2e3a52; --mut:#94a3b8;
+    --bub:#1f5130; --bubfg:#e6f7e9; --shadow:0 1px 3px rgba(0,0,0,.4);
+    --okfg:#4ade80; --lobg:#4a1d1d; --lofg:#fca5a5; --hibg:#43310f; --hifg:#fcd34d;
+  }
+}
+/* (data-theme="dark" を html に付けて強制的にダークにする場合) */
+:root[data-theme="dark"] {
+  --bg:#0f172a; --fg:#e8ecf5; --card:#1b2437; --ac:#818cf8; --ac2:#38bdf8; --bd:#2e3a52; --mut:#94a3b8;
+  --bub:#1f5130; --bubfg:#e6f7e9; --shadow:0 1px 3px rgba(0,0,0,.4);
+  --okfg:#4ade80; --lobg:#4a1d1d; --lofg:#fca5a5; --hibg:#43310f; --hifg:#fcd34d;
+}
 
-#gate{display:none;position:fixed;inset:0;z-index:99;background:var(--bg);align-items:center;justify-content:center;padding:24px;padding-top:calc(24px + env(safe-area-inset-top,0px))}
-html.locked #gate{display:flex}
-html.locked body>*:not(#gate){display:none!important}
-.gbox{width:100%;max-width:300px;text-align:center}
-.gbox h2{margin:0 0 6px}.gbox p{margin:0 0 18px;color:var(--mut)}
-#pin,#pinbtn{display:block;box-sizing:border-box;width:100%;max-width:200px;margin:0 auto}
-#pin{margin-bottom:14px;font-size:24px;letter-spacing:.4em;text-align:center;padding:9px 0 9px .4em}
-#pinbtn{padding:10px;font-size:16px}
-#pinmsg{display:block;margin-top:12px;min-height:1.4em;color:#dc2626}
+/* ---------- 全体 ---------- */
+html { scroll-padding-top:env(safe-area-inset-top,0px); }
+body {
+  margin:0 auto; max-width:640px;
+  padding:12px 12px 96px;            /* 下は固定ナビの高さぶん空ける */
+  background:var(--bg); color:var(--fg);
+  font:16px/1.55 system-ui,"Hiragino Sans","Noto Sans JP",sans-serif;
+}
+main { display:none; }               /* 画面(シフト作成/人件費累計/登録/その他)は1つだけ表示 */
+main.on { display:block; }
 
-/* ---- 簡略レイアウト(人数カウント版) ---- */
-:root{--okfg:#15803d;--lobg:#fee2e2;--lofg:#b91c1c;--hibg:#fef3c7;--hifg:#92400e}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--okfg:#4ade80;--lobg:#4a1d1d;--lofg:#fca5a5;--hibg:#43310f;--hifg:#fcd34d}}
-:root[data-theme="dark"]{--okfg:#4ade80;--lobg:#4a1d1d;--lofg:#fca5a5;--hibg:#43310f;--hifg:#fcd34d}
-header{padding:10px 16px;margin:0 0 10px;border-radius:14px}
-header h1{font-size:18px}
-details{padding:8px 12px;margin:6px 0}
-details.sub{background:none;border:0;border-top:1px dashed var(--bd);border-radius:0;box-shadow:none;padding:6px 0 0;margin:6px 0 0}
-summary{font-size:14px}
-.top select{flex:1 1 0}
-#d{font-size:16px}
-.btnl{display:inline-block;padding:8px 14px;border-radius:10px;font-weight:600;cursor:pointer;font-size:15px}
-.badges{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 6px}
-.bd{font-size:13px;font-weight:700;padding:3px 10px;border-radius:12px;border:1px solid var(--bd);background:var(--card);white-space:nowrap}
-.bd.ok{color:var(--okfg);border-color:var(--okfg)}
-.bd.lo{background:var(--lobg);color:var(--lofg);border-color:var(--lofg)}
-.bd.hi{background:var(--hibg);color:var(--hifg);border-color:var(--hifg)}
-.pr{background:var(--card);border:1px solid var(--bd);border-left:5px solid var(--ac2);border-radius:12px;margin:6px 0;box-shadow:var(--shadow)}
-.pr.open{border-color:var(--ac)}
-.pr.emp{border-left-color:#f59e0b}
-.ph{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,auto);gap:10px;align-items:center;padding:9px 12px;cursor:pointer}
-.pn{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pt{color:var(--mut);font-variant-numeric:tabular-nums}
-.pp{color:var(--ac);font-weight:700;max-width:9em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pe{padding:2px 12px 10px;border-top:1px dashed var(--bd)}
-.empty{padding:14px;text-align:center;color:var(--mut)}
-.drow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0}
-.inp{padding:6px 12px}
-.lfr{margin-top:8px;line-height:1.7}.lfr b{font-size:17px}.lfr .need{font-weight:800;color:var(--lofg)}.lfr .okk{font-weight:800;color:var(--okfg)}
-.mh{display:block;color:var(--mut);margin:-2px 0 8px 2px}
+/* ---------- 上部のタイトル帯 ---------- */
+header {
+  display:flex; align-items:baseline; gap:10px;
+  margin:0 0 10px; padding:10px 16px; border-radius:14px;
+  color:#fff; background:linear-gradient(135deg,var(--ac),var(--ac2));
+  box-shadow:0 4px 14px rgba(79,70,229,.25);
+}
+header h1 { margin:0; font-size:18px; letter-spacing:.04em; }
+header span { font-size:14px; opacity:.9; background:rgba(255,255,255,.22); padding:1px 10px; border-radius:12px; }
+
+/* ---------- 入力部品の共通デザイン ---------- */
+input, select, button, textarea {
+  font:inherit; color:var(--fg); background:var(--bg);
+  border:1px solid var(--bd); border-radius:10px; padding:8px 10px; min-width:0;
+}
+input:focus, select:focus, textarea:focus { outline:2px solid var(--ac); outline-offset:0; }
+button {                              /* 標準のボタン(塗りつぶし) */
+  background:linear-gradient(135deg,var(--ac),var(--ac2)); color:#fff;
+  border:0; font-weight:600; padding:8px 14px; cursor:pointer; box-shadow:var(--shadow);
+}
+button:active { transform:scale(.96); }
+.ghost { background:transparent!important; color:var(--ac); border:1px solid var(--ac); box-shadow:none; }  /* 枠だけのボタン */
+.del   { background:#ef4444!important; padding:6px 11px; }                                                /* 赤い削除ボタン */
+#rst, button[data-res] { background:transparent; color:var(--ac); border:1px solid var(--ac); box-shadow:none; }
+.btnl { display:inline-block; padding:8px 14px; border-radius:10px; font-weight:600; cursor:pointer; font-size:15px; }
+label { display:inline-flex; align-items:center; gap:4px; }
+small { color:var(--mut); }
+.t { width:64px; }                    /* 数字入力用の細い欄 */
+.n { flex:1 1 90px; width:90px; }     /* 名前入力用 */
+
+/* ---------- レイアウトの部品 ---------- */
+.row  { display:flex; gap:6px; margin:6px 0; align-items:center; flex-wrap:wrap; }   /* 横並びの1行(はみ出すと折り返す) */
+.card { background:var(--card); border:1px solid var(--bd); border-radius:14px; padding:10px 12px; margin:8px 0; box-shadow:var(--shadow); }
+.inp  { padding:6px 12px; }
+details { background:var(--card); border:1px solid var(--bd); border-radius:14px; padding:8px 12px; margin:6px 0; box-shadow:var(--shadow); }
+details.sub { background:none; border:0; border-top:1px dashed var(--bd); border-radius:0; box-shadow:none; padding:6px 0 0; margin:6px 0 0; }
+summary { cursor:pointer; font-weight:600; color:var(--ac); font-size:14px; }
+h3 { margin:24px 0 4px; font-size:15px; display:flex; align-items:center; gap:8px; }
+h3::before { content:""; width:5px; height:17px; border-radius:3px; background:linear-gradient(var(--ac),var(--ac2)); }
+.top select { flex:1 1 0; }
+#d { font-weight:700; font-size:16px; }          /* 日付の選択 */
+
+/* ---------- 出力欄(LINE風の吹き出し) ---------- */
+pre {
+  background:var(--bub); color:var(--bubfg); padding:14px 16px;
+  border-radius:18px 18px 4px 18px; white-space:pre-wrap; overflow-x:auto;
+  font:15px/1.6 ui-monospace,"Noto Sans Mono CJK JP",Menlo,monospace; box-shadow:var(--shadow);
+}
+
+/* ---------- ポジションの選択ボタン(チップ) ---------- */
+.chip { padding:4px 12px; font-size:14px; border-radius:16px; }
+.chip.on  { background:var(--ac); color:#fff; border:0; }
+.chip.off { background:transparent; color:var(--fg); border:1px solid var(--bd); box-shadow:none; font-weight:400; }
+
+/* ---------- ポジションごとの人数バッジ ---------- */
+.badges { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 6px; }
+.bd { font-size:13px; font-weight:700; padding:3px 10px; border-radius:12px; border:1px solid var(--bd); background:var(--card); white-space:nowrap; }
+.bd.ok { color:var(--okfg); border-color:var(--okfg); }                    /* 足りている */
+.bd.lo { background:var(--lobg); color:var(--lofg); border-color:var(--lofg); }  /* 不足 */
+.bd.hi { background:var(--hibg); color:var(--hifg); border-color:var(--hifg); }  /* 多い */
+
+/* ---------- 人の行(.pr)。タップで編集欄(.pe)が開く ---------- */
+.pr { background:var(--card); border:1px solid var(--bd); border-left:5px solid var(--ac2); border-radius:12px; margin:6px 0; box-shadow:var(--shadow); }
+.pr.open { border-color:var(--ac); }
+.pr.emp  { border-left-color:#f59e0b; }                    /* 社員は橙色の帯 */
+.ph { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,auto); gap:10px; align-items:center; padding:9px 12px; cursor:pointer; }
+.pn { font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }                 /* 名前 */
+.pt { color:var(--mut); font-variant-numeric:tabular-nums; }                                          /* 時間 */
+.pp { color:var(--ac); font-weight:700; max-width:9em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }  /* ポジション */
+.pe { padding:2px 12px 10px; border-top:1px dashed var(--bd); }                                       /* 編集欄 */
+.brl { color:var(--mut); font-size:14px; min-width:2.5em; }                                           /* 「休憩」の見出し */
+.brh { color:var(--mut); font-size:14px; min-width:2.5em; }                                           /* 休憩の時間数 */
+.empty { padding:14px; text-align:center; color:var(--mut); }
+.drow  { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:4px 0; }   /* 削除した人の1行 */
+
+/* ---------- 着地予想の結果表示 ---------- */
+.lfr { margin-top:8px; line-height:1.7; }
+.lfr b { font-size:17px; }
+.lfr .need { font-weight:800; color:var(--lofg); }   /* 「あとXH削減が必要」 */
+.lfr .okk  { font-weight:800; color:var(--okfg); }   /* 「目標以内」 */
+.mh { display:block; color:var(--mut); margin:-2px 0 8px 2px; }   /* 社員の月累計 */
+
+/* ---------- 下部の固定ナビ ---------- */
+nav {
+  position:fixed; left:0; right:0; bottom:0; display:flex; z-index:9;
+  background:var(--card); border-top:1px solid var(--bd);
+  padding:6px 4px; padding-bottom:calc(6px + env(safe-area-inset-bottom,0px));
+  box-shadow:0 -2px 10px rgba(30,41,90,.08);
+}
+#nav button { flex:1; background:none; color:var(--mut); box-shadow:none; border-radius:10px; font-size:11px; font-weight:600;
+  padding:4px 2px; display:flex; flex-direction:column; align-items:center; gap:2px; line-height:1.2; }
+#nav button b { font-size:20px; font-weight:400; }
+#nav button.on { color:var(--ac); background:var(--bg); }
+
+/* ---------- 4桁の番号入力画面(ログイン) ---------- */
+#gate { display:none; position:fixed; inset:0; z-index:99; background:var(--bg); align-items:center; justify-content:center;
+  padding:24px; padding-top:calc(24px + env(safe-area-inset-top,0px)); }
+html.locked #gate { display:flex; }                                  /* ロック中だけ表示 */
+html.locked body > *:not(#gate) { display:none!important; }         /* ロック中は他をすべて隠す */
+.gbox { width:100%; max-width:300px; text-align:center; }
+.gbox h2 { margin:0 0 6px; }
+.gbox p  { margin:0 0 18px; color:var(--mut); }
+#pin, #pinbtn { display:block; box-sizing:border-box; width:100%; max-width:200px; margin:0 auto; }
+#pin { margin-bottom:14px; font-size:24px; letter-spacing:.4em; text-align:center; padding:9px 0 9px .4em; }
+#pinbtn { padding:10px; font-size:16px; }
+#pinmsg { display:block; margin-top:12px; min-height:1.4em; color:#dc2626; }
 </style></head>
 <body>
-<div id="gate"><div class="gbox"><h2>シフト作成</h2><p>4桁の番号を入力してください</p><input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" aria-label="4桁の番号"><button id="pinbtn">開く</button><small id="pinmsg"></small></div></div>
+
+<!-- ============================================================
+     画面の部品(HTML)
+     id="..." は JavaScript から部品を探す名前。むやみに変えない。
+     ============================================================ -->
+
+<!-- 4桁の番号入力画面(ロック中だけ表示される。判定は最後の <script>) -->
+<div id="gate"><div class="gbox">
+  <h2>シフト作成</h2><p>4桁の番号を入力してください</p>
+  <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" aria-label="4桁の番号">
+  <button id="pinbtn">開く</button><small id="pinmsg"></small>
+</div></div>
+
+<!-- 上部のタイトル帯(#ttl=画面名、#sn=現在の店舗名) -->
 <header><h1 id="ttl">シフト作成</h1><span id="sn"></span></header>
+
+
+<!-- ===================== 画面1: シフト作成 ===================== -->
 <main id="v1" class="on">
-<div class="row top"><select id="st"></select><select id="d"></select><label><input type="checkbox" id="hol"> 祝日</label></div>
-<details id="ld"><summary id="lds">Excelを読み込む</summary>
-<div class="row"><select id="mm"></select><select id="hf"><option>前半</option><option>後半</option></select></div>
-<div class="row"><button id="od">OneDriveから読み込む</button><label class="btnl ghost">ファイルを選ぶ<input type="file" id="f" hidden accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label></div>
-<div class="row"><select id="sh" style="display:none;flex:1"></select></div>
-<small id="msg">月と前半・後半を選んで、Excelを読み込んでください</small>
-</details>
-<div id="pos" class="badges"></div>
-<div id="rows"></div>
-<div class="row"><button id="add">＋ 人を追加</button></div>
-<details id="dd"><summary>削除した人 <span id="dn"></span></summary><div id="del"></div><div class="row"><button id="rst" class="ghost">この日をExcelの内容に戻す</button></div></details>
-<div class="card inp"><div class="row">予約 <input id="g" type="number" class="t" placeholder="組" inputmode="numeric">組 <input id="pp" type="number" class="t" placeholder="名" inputmode="numeric">名 売上 <input id="tg" type="number" style="flex:1 1 90px" placeholder="円" inputmode="numeric"></div>
-<div class="row"><input id="nt" style="flex:1" placeholder="備考(任意)"></div></div>
-<details id="lf"><summary id="lfs">着地予想（中間報告）</summary>
-<div class="row">中間売上 <input id="lfm" type="number" inputmode="numeric" style="flex:1 1 90px" placeholder="円">円</div>
-<div class="row">着地売上予想 <input id="lfv" type="number" inputmode="numeric" style="flex:1 1 90px" placeholder="円">円</div>
-<div class="row">現在の人件費率 <input id="lfn" type="number" step="0.1" inputmode="decimal" class="t" placeholder="自動">% 　着地の目標 <input id="lft" type="number" step="0.1" inputmode="decimal" class="t">%</div>
-<small>現在の人件費率は空欄なら「今の人員の人件費 ÷ 着地売上予想」で自動計算します。休憩での早上げなどは、上の時間を直すと反映されます。</small>
-<div id="lfr" class="lfr"></div>
-<h3 style="margin-top:12px">中間報告の出力</h3><pre id="lfo"></pre><div class="row"><button id="lfc">コピー</button></div></details>
-<h3>出力</h3><pre id="out"></pre>
-<div class="row"><button id="cp">コピー</button><small id="lb"></small></div>
+
+  <!-- 店舗・日付の選択、祝日チェック -->
+  <div class="row top">
+    <select id="st"></select>
+    <select id="d"></select>
+    <label><input type="checkbox" id="hol"> 祝日</label>
+  </div>
+
+  <!-- Excelの読み込み(読み込めたら自動で閉じる) -->
+  <details id="ld">
+    <summary id="lds">Excelを読み込む</summary>
+    <div class="row">
+      <select id="mm"></select>                                   <!-- 月(JSで1〜12を入れる) -->
+      <select id="hf"><option>前半</option><option>後半</option></select>
+    </div>
+    <div class="row">
+      <button id="od">OneDriveから読み込む</button>
+      <label class="btnl ghost">ファイルを選ぶ<input type="file" id="f" hidden accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+    </div>
+    <div class="row"><select id="sh" style="display:none;flex:1"></select></div>   <!-- シートを手動で選ぶ時用 -->
+    <small id="msg">月と前半・後半を選んで、Excelを読み込んでください</small>
+  </details>
+
+  <!-- ポジションごとの人数バッジ(⚠不足 / ▲多い) -->
+  <div id="pos" class="badges"></div>
+
+  <!-- 人の一覧(1人1行。タップで編集欄が開く) -->
+  <div id="rows"></div>
+  <div class="row"><button id="add">＋ 人を追加</button></div>
+
+  <!-- 削除した人(戻すボタン)と、この日をExcelの内容に戻すボタン -->
+  <details id="dd">
+    <summary>削除した人 <span id="dn"></span></summary>
+    <div id="del"></div>
+    <div class="row"><button id="rst" class="ghost">この日をExcelの内容に戻す</button></div>
+  </details>
+
+  <!-- 予約・売上・備考 -->
+  <div class="card inp">
+    <div class="row">
+      予約 <input id="g" type="number" class="t" placeholder="組" inputmode="numeric">組
+      <input id="pp" type="number" class="t" placeholder="名" inputmode="numeric">名
+      売上 <input id="tg" type="number" style="flex:1 1 90px" placeholder="円" inputmode="numeric">
+    </div>
+    <div class="row"><input id="nt" style="flex:1" placeholder="備考(任意)"></div>
+  </div>
+
+  <!-- 着地予想(中間報告)。中間売上・着地売上予想・人件費率を入れる -->
+  <details id="lf">
+    <summary id="lfs">着地予想（中間報告）</summary>
+    <div class="row">中間売上 <input id="lfm" type="number" inputmode="numeric" style="flex:1 1 90px" placeholder="円">円</div>
+    <div class="row">着地売上予想 <input id="lfv" type="number" inputmode="numeric" style="flex:1 1 90px" placeholder="円">円</div>
+    <div class="row">
+      現在の人件費率 <input id="lfn" type="number" step="0.1" inputmode="decimal" class="t" placeholder="自動">%
+      　削減計算用の目標率 <input id="lft" type="number" step="0.1" inputmode="decimal" class="t">%
+    </div>
+    <small>現在の人件費率は空欄なら「今の人員の人件費 ÷ 着地売上予想」で自動計算します。休憩の早上げなどは、上の時間や休憩を直すと反映されます。目標率は「あと何時間削減か」の計算だけに使い、中間報告の文面には出ません。</small>
+    <div id="lfr" class="lfr"></div>
+    <h3 style="margin-top:12px">中間報告の出力</h3>
+    <pre id="lfo"></pre>
+    <div class="row"><button id="lfc">コピー</button></div>
+  </details>
+
+  <!-- シフトの出力(LINEなどに貼る文面) -->
+  <h3>出力</h3>
+  <pre id="out"></pre>
+  <div class="row"><button id="cp">コピー</button><small id="lb"></small></div>
 </main>
+
+
+<!-- ===================== 画面2: 人件費累計(準備中) ===================== -->
 <main id="v2"><h3>人件費累計</h3><div class="card"><small>準備中です</small></div></main>
+
+<!-- ===================== 画面3: 登録情報(中身はJSの renderReg が作る) ===================== -->
 <main id="v3"></main>
+
+<!-- ===================== 画面4: その他(準備中) ===================== -->
 <main id="v4"><h3>その他</h3><div class="card"><small>準備中です</small></div></main>
-<nav id="nav"><button data-n="1" class="on"><b>📋</b>シフト作成</button><button data-n="2"><b>💴</b>人件費累計</button><button data-n="3"><b>⚙️</b>登録情報確認・編集</button><button data-n="4"><b>…</b>その他</button></nav>
+
+<!-- 下部の画面切り替えナビ(data-n が画面番号) -->
+<nav id="nav">
+  <button data-n="1" class="on"><b>📋</b>シフト作成</button>
+  <button data-n="2"><b>💴</b>人件費累計</button>
+  <button data-n="3"><b>⚙️</b>登録情報確認・編集</button>
+  <button data-n="4"><b>…</b>その他</button>
+</nav>
+
+<!-- Excelを読むための外部ライブラリ(SheetJS) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
-const KEY="shift-s2",WD="日月火水木金土",$=i=>document.getElementById(i);
-const P=(n,role,parent,kw,wk,fs,sat,ab)=>({n,role,parent,kw,wk,fs,sat,ab});
-const SEED=()=>({id:1,name:"店舗1",wage:0,daily:0,dv:3,emps:[],pos:[],skill:{},days:{},cur:null});
-let S=null,WB,cur=null,armed=false;
-try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
-if(!S||!S.stores)S={stores:[SEED()],cs:1};
-S.stores.forEach(T=>T.pos.forEach(p=>{if(p.ab===undefined)p.ab=p.n==="ホール"?"ホ":""}));
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
-const ST=()=>S.stores.find(x=>x.id===S.cs)||S.stores[0];
-const DY=()=>ST().days;
-const setCur=k=>{cur=k;ST().cur=k};
-const dtype=D=>D.wd==="土"?"sat":(D.hol||D.wd==="金"||D.wd==="日")?"fs":"wk";
-const kws=p=>[p.n,...String(p.kw||"").split(/[,、\s]+/)].filter(Boolean);
-const num=x=>String(+x);
-const wid=s=>[...s].reduce((a,c)=>a+(c.charCodeAt(0)>255?2:1),0);
-const pad=(s,w)=>s+" ".repeat(Math.max(w-wid(s),0));
-const prep=t=>(t||"").normalize("NFKC").replace(/(\d)[.,、・](\d)階/g,"$1階$2階");
-const setP=(o,path,v)=>{const k=path.split(".");let t=o;for(let i=0;i<k.length-1;i++)t=t[k[i]];t[k[k.length-1]]=v};
-function ensure(r){if(r.ps)return;const T=ST(),t=prep(r.p),f=[];
-  T.pos.forEach(p=>{const ix=Math.min(...kws(p).map(k=>{const j=t.indexOf(k);return j<0?1e9:j}));if(ix<1e9)f.push([ix,p.n])});
-  f.sort((a,b)=>a[0]-b[0]);r.ps=f.map(x=>x[1]);r.x=r.ps.length?"":(r.p||"")}
-const posTxt=r=>{ensure(r);const ab=n=>{const q=ST().pos.find(p=>p.n===n);return q?(q.ab!==undefined?q.ab:(n==="ホール"?"ホ":""))||n:n};
-  return[r.ps.length>1?r.ps.map(ab).join(""):r.ps.join(""),r.x].filter(Boolean).join(" ")};
-const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-let OPEN=null;
-const REGOPEN=new Set();
-const kid=r=>r.k||(r.k=Math.random().toString(36).slice(2,8));
-const sortRows=D=>{D.rows.sort((a,b)=>a.s-b.s)};
-const cnt=(p,t)=>{const v=p["c"+t];return v===undefined||v===null?(p[t]!=null?"1":""):String(v)};
-function rng(p,t){const s=cnt(p,t).normalize("NFKC").replace(/[~〜～ー–—－]/g,"-").replace(/\s+/g,"");
-  if(s==="")return null;const m=s.match(/^(\d+)(?:-(\d+))?$/);if(!m)return null;
-  const a=+m[1],b=m[2]!==undefined?+m[2]:a;
-  if(m[2]===undefined&&a===0)return{lo:0,hi:Infinity};
-  return{lo:Math.min(a,b),hi:Math.max(a,b)}}
-function avail(T,t){return T.pos.filter(p=>p.n&&rng(p,t)&&!(p.role==="parent"&&T.pos.some(c=>c.role==="child"&&c.parent===p.n&&rng(c,t))))}
-function chips(r,k){ensure(r);
-  return `<div class="row">`+avail(ST(),dtype(DY()[cur])).map(p=>{const i=r.ps.indexOf(p.n);
-    return `<button class="chip ${i>=0?"on":"off"}" data-r="${k}" data-c="${esc(p.n)}">${esc(p.n)}${i>=0&&r.ps.length>1?("①②③④⑤⑥⑦⑧⑨"[i]||""):""}</button>`}).join("")+`</div>`}
-function rowHTML(r){const k=kid(r),open=OPEN===k,emp=ST().emps.some(e=>e.n&&e.n===r.n);ensure(r);
-  return `<div class="pr${emp?" emp":""}${open?" open":""}" data-key="${k}"><div class="ph" data-tog="${k}"><span class="pn">${esc(r.n)||"（名前未入力）"}</span><span class="pt">${num(r.s)}-${num(r.e)}</span><span class="pp">${esc(posTxt(r))}</span></div>`+
-  (open?`<div class="pe"><div class="row"><input class="n" placeholder="名前" value="${esc(r.n)}" data-r="${k}" data-f="n"><input class="t" type="number" step="0.5" inputmode="decimal" value="${r.s}" data-r="${k}" data-f="s"> 〜 <input class="t" type="number" step="0.5" inputmode="decimal" value="${r.e}" data-r="${k}" data-f="e"></div>${chips(r,k)}<div class="row"><input style="flex:1 1 120px" placeholder="その他（自由記述）" value="${esc(r.x)}" data-r="${k}" data-f="x"><button class="del" data-delr="${k}">外す</button><button class="ghost" data-tog="${k}">閉じる</button></div></div>`:"")+`</div>`}
-function board(rows,D){const T=ST(),t=dtype(D);
-  if(!T.pos.length)return "<small>登録情報でポジションを登録すると、ここに人数が出ます</small>";
-  rows.forEach(r=>ensure(r));
-  return avail(T,t).map(p=>{const g=rng(p,t),c=rows.filter(r=>r.ps.includes(p.n)).length,lo=c<g.lo,hi=c>g.hi,
-    std=g.hi===Infinity?"":"/"+(g.lo===g.hi?g.lo:g.lo+"-"+g.hi);
-    return `<span class="bd ${lo?"lo":hi?"hi":"ok"}">${lo?"⚠ ":hi?"▲ ":""}${esc(p.n)} ${c}${std}</span>`}).join("")}
-function toggleRow(k){const D=DY()[cur];if(!D)return;OPEN=OPEN===k?null:k;sortRows(D);save();draw();
-  const el=OPEN?document.querySelector('.pr[data-key="'+k+'"]'):null;if(el)el.scrollIntoView({block:"nearest",behavior:"smooth"})}
-const msg=t=>{$("msg").textContent=t;$("ld").open=true};
-const nz=s=>(s||"").normalize("NFKC").replace(/\s+/g,"");
-function load(buf){WB=XLSX.read(buf,{type:"array",cellDates:true});pick()}
-function sheetFor(m,hf){const N=WB.SheetNames,sn=nz(ST().name),c=N.filter(n=>new RegExp("(^|\\D)"+m+"月"+hf).test(nz(n))),
-  mine=c.filter(n=>sn&&nz(n).includes(sn)),plain=c.filter(n=>new RegExp("^"+m+"月"+hf).test(nz(n)));return{c,use:mine.length?mine:plain}}
-function pick(){const N=WB.SheetNames,m=$("mm").value,hf=$("hf").value,oh=hf==="前半"?"後半":"前半",sh=$("sh"),A=sheetFor(m,hf),B=sheetFor(m,oh);
-  sh.innerHTML=N.map(n=>`<option>${n}</option>`).join("");sh.style.display=N.length>1?"":"none";
-  if(A.use.length){sh.value=A.use[0];parse(B.use.length?[A.use[0],B.use[0]]:[A.use[0]]);if(A.use.length>1)msg($("msg").textContent+"(同じ名前に当てはまるシートが"+A.use.length+"枚あります。上の選択で切り替えられます)")}
-  else if(A.c.length){sh.value=A.c[0];msg("「"+m+"月"+hf+"」に当てはまるシートは、別の名前が付いたものだけでした("+A.c.join("、")+")。この店舗のシートか確認して、上の選択から選んでください")}
-  else{msg("「"+m+"月"+hf+"」に当てはまるシートがありません。上の選択から直接選べます")}}
-let PREFTODAY=true;
-function readSheet(name){const ws=WB.Sheets[name],a=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null}),days={};
-  (a[0]||[]).forEach((v,c)=>{if(!(v instanceof Date))return;
-    const d=new Date(v.getTime()+12*36e5),k=(d.getUTCMonth()+1)+"/"+d.getUTCDate(),rows=[];
-    for(let r=8;r<a.length;r++){const n=a[r][1],s=a[r][c],e=a[r][c+1];
-      if(!n||n==="ホール"||n==="キッチン"||typeof s!=="number"||typeof e!=="number")continue;rows.push({n:String(n).trim(),s,e,ps:[],x:""})}
-    rows.sort((x,y)=>x.s-y.s);const tg=parseInt(String(a[2]&&a[2][c]||"").replace(/,/g,""))||"";
-    days[k]={wd:WD[d.getUTCDay()],rows,g:"",pp:"",tg,nt:"",orig:JSON.stringify({rows,tg})}});
-  return Object.keys(days).length?days:null}
-const rk=rows=>JSON.stringify(rows.map(r=>[r.n,r.s,r.e]).sort());
-function touched(E){let o;try{o=JSON.parse(E.orig)}catch(e){return true}
-  return rk(E.rows)!==rk(o.rows)||(+E.tg||0)!==(+o.tg||0)||E.rows.some(r=>(r.ps&&r.ps.length)||r.x)||!!(E.del&&E.del.length)||
-    !!(E.g||E.pp||E.nt||E.hol||E.ms||E.lf||E.cr||E.tr)||Object.keys(E.ov||{}).length>0}
-function mergeDays(nd){const T=ST(),old=T.days||{},mons=new Set(Object.keys(nd).map(k=>k.split("/")[0])),o={},kept=[],xl=[];
-  Object.keys(old).forEach(k=>{if(mons.has(k.split("/")[0]))o[k]=old[k]});
-  Object.keys(nd).forEach(k=>{const E=o[k];
-    if(E&&touched(E)){kept.push(k);if(E.orig!==nd[k].orig){xl.push(k);E.orig=nd[k].orig}}else o[k]=nd[k]});
-  const ks=Object.keys(o).sort((a,b)=>{const[x,y]=a.split("/").map(Number),[p,q]=b.split("/").map(Number);return x-p||y-q});
-  T.days=Object.fromEntries(ks.map(k=>[k,o[k]]));return{kept,xl}}
-function parse(names){const nd={};let fk=null,ok=false;
-  names.forEach(n=>{const d=readSheet(n);if(!d)return;ok=true;if(fk===null)fk=Object.keys(d)[0];Object.assign(nd,d)});
-  if(!ok){msg("「"+names[0]+"」に日付の行が見つかりません");return}
-  const T=ST(),src=names.join("・"),newSrc=T.src!==src,r=mergeDays(nd),now=new Date(),today=(now.getMonth()+1)+"/"+now.getDate();
-  T.src=src;OPEN=null;
-  if(PREFTODAY&&T.days[today])setCur(today);else if(!cur||!T.days[cur]||newSrc)setCur(fk);
-  PREFTODAY=false;save();
-  $("msg").textContent=src+": "+Object.keys(T.days).length+"日分を読み込みました"+(r.kept.length?"。編集済みの"+r.kept.length+"日分は、保存した内容のままにしています":"");
-  init();
-  if(r.xl.length)msg($("msg").textContent+"。Excel側も変わっていた日: "+r.xl.slice(0,6).join("、")+(r.xl.length>6?"など":"")+"(その日の「削除した人」の中の「Excelの内容に戻す」で最新を反映できます)")}
-function fillStores(){const o=S.stores.map(s=>`<option value="${s.id}" ${s.id===S.cs?"selected":""}>${s.name}</option>`).join("");
-  $("st").innerHTML=o;if($("rs"))$("rs").innerHTML=o;$("sn").textContent=ST().name}
-function switchStore(id){S.cs=id;cur=ST().cur;save();fillStores();init();renderReg()}
-function init(){const T=ST(),k=Object.keys(DY());if(!cur||!DY()[cur])setCur(k[0]||null);
-  $("d").innerHTML=k.map(x=>`<option value="${x}" ${x===cur?"selected":""}>${x}(${DY()[x].wd})</option>`).join("");
-  $("lds").textContent=k.length?`${T.src||"読み込み済み"}・${k.length}日分`:"Excelを読み込む";
-  $("ld").open=!k.length;draw()}
-function draw(){const D=DY()[cur];
-  if(!D){["rows","pos","del"].forEach(i=>$(i).innerHTML="");$("out").textContent="";$("lb").textContent="";$("dn").textContent="";return}
-  D.del=D.del||[];$("hol").checked=!!D.hol;
-  $("rows").innerHTML=D.rows.map(rowHTML).join("")||'<div class="empty">人員がいません。「＋ 人を追加」で入れてください</div>';
-  $("dn").textContent=D.del.length?`(${D.del.length})`:"";
-  $("del").innerHTML=D.del.map((r,i)=>`<div class="drow"><span>${esc(r.n)||"（名前未入力）"} ${num(r.s)}-${num(r.e)} ${esc(posTxt(r))}</span><button class="ghost" data-res="${i}">戻す</button></div>`).join("")||"<small>なし</small>";
-  $("g").value=D.g;$("pp").value=D.pp;$("tg").value=D.tg;$("nt").value=D.nt;
-  $("lfm").value=D.ms==null?"":D.ms;$("lfv").value=D.lf==null?"":D.lf;$("lfn").value=D.cr==null?"":D.cr;$("lft").value=D.tr!=null&&D.tr!==""?D.tr:(ST().tr==null?"":ST().tr);out()}
-function out(){const T=ST(),D=DY()[cur];if(!D)return;
-  const rows=[...D.rows].sort((x,y)=>x.s-y.s),nw=Math.max(8,...rows.map(r=>wid(r.n)))+2,wage=+T.wage||0;
-  let h=0,labor=+T.daily||0;const L=[`${cur}(${D.wd})  ${T.name}`];
-  rows.forEach(r=>{const w=r.e-r.s,e=T.emps.find(x=>x.n===r.n);if(e)labor+=+e.v;else{h+=w;labor+=w*wage}
-    L.push((pad(r.n,nw)+pad(num(r.s)+"-"+num(r.e),12)+posTxt(r)).trimEnd())});
-  const m=[];if(D.g||D.pp)m.push(`${D.g||0}組${D.pp||0}名`);
-  m.push(num(h)+"H");if(D.tg)m.push(num(+(D.tg/1e4).toFixed(1))+"万");
-  L.push(m.join("  "));
-  const t=[];if(D.tg)t.push(Math.round(labor/D.tg*100)+"%");if(D.nt)t.push(D.nt);
-  if(t.length)L.push(t.join("   "));
-  const F=lfInfo(labor,D,wage);lfRender(F);
-  $("out").textContent=L.join("\n");$("pos").innerHTML=board(rows,D);
-  $("lb").textContent="人件費 "+Math.round(labor).toLocaleString()+"円"}
-const nn=v=>v===""||v==null||isNaN(+v)?null:+v;
-function lfInfo(labor,D,wage){const lf=nn(D.lf)||0,T=ST(),auto=lf?labor/lf*100:null,cr=nn(D.cr)!=null?nn(D.cr):auto,tr=nn(D.tr)!=null?nn(D.tr):nn(T.tr);
-  const F={lf,labor,auto,cr,tr};
-  if(lf&&cr!=null){F.lab=lf*cr/100;if(tr!=null){F.diff=(cr-tr)/100*lf;F.hours=wage>0?Math.ceil(Math.abs(F.diff)/wage*10)/10:null;F.wage=wage}}
-  return F}
-function lfReport(F,D){const T=ST(),m=x=>num(+(x/1e4).toFixed(1))+"万",p=x=>num(+x.toFixed(1))+"%",a=[];
-  if(nn(D.ms))a.push(T.name+"中間"+m(+D.ms));else a.push(T.name+"中間");
-  if(F.lf)a.push("着地予想"+m(F.lf));
-  const L=[a.join("　")];if(F.lf&&F.cr!=null)L.push("人件費予測"+p(F.cr));if(F.tr!=null)L.push("人件費目標"+p(F.tr));
-  $("lfo").textContent=L.join("\n")}
-function lfRender(F){lfReport(F,DY()[cur]||{});const box=$("lfr"),yen=x=>Math.round(x).toLocaleString()+"円";
-  $("lfn").placeholder=F.auto==null?"自動":F.auto.toFixed(1)+"(自動)";
-  if(!F.lf){box.innerHTML="<small>着地売上予想を入れると、着地の人件費と必要な削減時間が出ます</small>";$("lfs").textContent="着地予想（中間報告）";return}
-  let h=`着地の人件費予想 <b>${yen(F.lab)}</b>(${F.cr.toFixed(1)}%)`,sm="着地予想・"+F.cr.toFixed(1)+"%";
-  if(F.tr!=null){h+=`<br>目標 ${F.tr}% = ${yen(F.lf*F.tr/100)}`;
-    if(F.diff>0){h+=`<br><span class="need">あと ${F.hours==null?"?":num(F.hours)}H の削減が必要</span>(約${yen(F.diff)}分${F.hours==null?"。時給が未登録です":"・時給"+F.wage+"円で計算"})`;sm+=" あと"+(F.hours==null?"?":num(F.hours))+"H削減"}
-    else{h+=`<br><span class="okk">目標以内です</span>(あと${yen(-F.diff)}${F.hours==null?"":"・約"+num(F.hours)+"H分"}の余裕)`;sm+=" 目標以内"}}
-  else h+="<br><small>着地の目標%を入れると、必要な削減時間が出ます</small>";
-  box.innerHTML=h;$("lfs").textContent=sm}
-function monthStats(){const T=ST(),k=Object.keys(T.days||{});if(!k.length)return null;
-  const m=+(T.days[cur]?cur:k[0]).split("/")[0],now=new Date(),tm=now.getMonth()+1,td=now.getDate(),H={};
-  k.forEach(key=>{const[mo,d]=key.split("/").map(Number);if(mo!==m)return;
-    T.days[key].rows.forEach(r=>{const w=r.e-r.s;if(!(w>0))return;const o=H[r.n]||(H[r.n]={tot:0,upto:0});o.tot+=w;if(mo<tm||(mo===tm&&d<=td))o.upto+=w})});
-  return{m,now:m===tm,H}}
-function mhText(n,M){if(!M)return"シフトを読み込むと、月の累計時間が出ます";const o=M.H[n]||{tot:0,upto:0},f=x=>num(+x.toFixed(1))+"H";
-  return M.m+"月の累計 "+f(o.tot)+(M.now?"(今日まで "+f(o.upto)+")":"")}
-function refreshMh(){const M=monthStats();document.querySelectorAll("[data-mh]").forEach(e=>{const i=+e.dataset.mh,q=ST().emps[i];e.textContent=q&&q.n?mhText(q.n,M):""})}
-function renderReg(){const T=ST(),pn=T.pos.filter(p=>p.role==="parent"&&p.n).map(p=>p.n),
-  inp=(b,v,ty,ex)=>`<input data-b="${b}" ${ty?`data-t="${ty}"`:""} value="${esc(v)}" ${ex||""}>`,
-  roles={normal:"通常",parent:"親(子の人数をまとめる)",child:"子"};
-  $("v3").innerHTML=`<h3>店舗</h3><div class="card"><div class="row"><select id="rs" style="flex:1">${S.stores.map(s=>`<option value="${s.id}" ${s.id===T.id?"selected":""}>${esc(s.name)}</option>`).join("")}</select><button data-a="addst">＋複製して追加</button></div>
-  <div class="row">店舗名 ${inp("name",T.name,"","style='flex:1'")}</div>
-  <div class="row">時給 ${inp("wage",T.wage,"n","type=number style='width:90px'")}円 毎日の固定人件費 ${inp("daily",T.daily,"n","type=number style='width:90px'")}円</div>
-  <div class="row">OneDriveのファイル ${inp("od",T.od,"","style='flex:1' placeholder='共有リンク、または /フォルダ/ファイル名.xlsx'")}</div>
-  <div class="row"><button data-a="delst" class="ghost" ${S.stores.length<2?"disabled":""}>${armed?"本当に削除する":"この店舗を削除"}</button></div></div>
-  <h3>社員(シフトインした日に発生)</h3><div class="card"><small>累計は、読み込んだ月の全日(前半・後半)のシフト時間の合計です。削除した人は含みません。</small>${T.emps.map((e,i)=>`<div class="row">${inp(`emps.${i}.n`,e.n,"","style='flex:1' placeholder='名前'")}${inp(`emps.${i}.v`,e.v,"n","type=number style='width:90px'")}円<button data-a="delemp" data-i="${i}" class="del">×</button></div><small class="mh" data-mh="${i}"></small>`).join("")}<button data-a="addemp">＋社員追加</button></div>
-  <h3>ポジション・定数（人数）</h3><small>定数は人数です。範囲は「1-2」のように書きます。空欄=その曜日は使わない、0=人数の目安なし。</small>
-  ${T.pos.map((p,i)=>`<div class="card"><div class="row">${inp(`pos.${i}.n`,p.n,"","style='flex:1' placeholder='名前'")}<button data-a="up" data-i="${i}" class="ghost">↑</button><button data-a="delpos" data-i="${i}" class="del">×</button></div>
-  <div class="row">定数　平日${inp(`pos.${i}.cwk`,cnt(p,"wk"),"s","class=t placeholder=－")}金日祝${inp(`pos.${i}.cfs`,cnt(p,"fs"),"s","class=t placeholder=－")}土${inp(`pos.${i}.csat`,cnt(p,"sat"),"s","class=t placeholder=－")}</div>
-  <details class="sub" data-di="${i}" ${REGOPEN.has(i)?"open":""}><summary>詳細（種類・略称・判定語）</summary>
-  <div class="row"><select data-b="pos.${i}.role" data-rr="1">${Object.entries(roles).map(([k,l])=>`<option value="${k}" ${(p.role===k||(k==="normal"&&(p.role==="reg"||p.role==="free")))?"selected":""}>${l}</option>`).join("")}</select>
-  ${p.role==="child"?`<select data-b="pos.${i}.parent"><option value="">親を選ぶ</option>${pn.map(n=>`<option ${p.parent===n?"selected":""}>${esc(n)}</option>`).join("")}</select>`:""}</div>
-  <div class="row">複数担当時の略称 ${inp(`pos.${i}.ab`,p.ab,"","style='flex:1' placeholder='空欄=そのまま'")}</div>
-  <div class="row">判定語 ${inp(`pos.${i}.kw`,p.kw,"","style='flex:1' placeholder='略称などをカンマ区切りで'")}</div></details></div>`).join("")}
-  <button data-a="addpos">＋ポジション追加</button>
-  <h3>店舗情報の共有</h3><div class="card">
-  <small>この店舗の時給・固定人件費・社員・ポジション・定数を、同じ店舗の人に渡せます(シフトの内容は含みません)。</small>
-  <div class="row"><label><input type="checkbox" id="shod"> OneDriveのファイル場所も含める</label></div>
-  <div class="row"><button data-a="shnative">共有する</button><button data-a="shlink" class="ghost">リンクをコピー</button><button data-a="shtext" class="ghost">テキストをコピー</button></div>
-  <small id="shmsg"></small>
-  <div class="row" style="margin-top:14px"><b>受け取った内容を取り込む</b></div>
-  <textarea id="shin" rows="3" style="width:100%" placeholder="受け取ったリンクまたはテキストを貼り付け"></textarea>
-  <div class="row"><button data-a="shread">読み取る</button></div>
-  <div id="impbox"></div></div>
-  <details><summary>OneDrive連携の詳細</summary><div class="row">クライアントID <input data-g="cid" value="${esc(S.cid||"")}" style="flex:1" placeholder="空欄でOK（ファイルに設定済み）" autocomplete="off"></div>
-  <div class="row"><label><input type="checkbox" data-g2="auto" ${S.auto===false?"":"checked"}> 起動時にOneDriveを自動で読み込む</label></div>
-  <small>登録時に指定するリダイレクトURI: ${redir()}</small><div class="row"><button data-a="odout" class="ghost">Microsoftからログアウト</button></div></details>`;refreshMh();shRefresh();renderImp()}
-$("v3").oninput=e=>{const t=e.target,b=t.dataset.b;if(t.dataset.g){S[t.dataset.g]=t.value.trim();save();return}if(!b)return;let v=t.value;if(t.dataset.t==="n")v=+v||0;if(t.dataset.t==="z")v=v===""?null:+v;if(t.dataset.t==="s")v=v.trim();
-  setP(ST(),b,v);save();if(b==="name")fillStores();if(/^emps\.\d+\.n$/.test(b))refreshMh();shRefresh()};
-$("v3").onchange=e=>{if(e.target.dataset.rr)renderReg();if(e.target.id==="rs")switchStore(+e.target.value);if(e.target.id==="shod")shRefresh();if(e.target.dataset.g2){S.auto=e.target.checked;save()}};
-$("v3").onclick=e=>{const d=e.target.dataset,a=d.a,T=ST();if(!a)return;if(a!=="delst")armed=false;if(a.indexOf("sh")===0||a.indexOf("imp")===0){shAct(a);return}
-  if(a==="addst"){const n=JSON.parse(JSON.stringify(T));n.id=Date.now();n.name=T.name+"(コピー)";n.days={};n.skill={};n.cur=null;S.stores.push(n);switchStore(n.id);return}
-  if(a==="delst"){if(S.stores.length<2)return;if(!armed){armed=true;renderReg();return}armed=false;S.stores=S.stores.filter(s=>s.id!==T.id);switchStore(S.stores[0].id);return}
-  if(a==="odout"){localStorage.removeItem("od-tok");alert&&0;renderReg();return}
-  if(a==="addemp")T.emps.push({n:"",v:0});if(a==="delemp")T.emps.splice(+d.i,1);
-  if(a==="addpos"){T.pos.push({n:"",role:"normal",parent:"",kw:"",ab:"",wk:0,fs:0,sat:0,cwk:"1",cfs:"1",csat:"1"});REGOPEN.clear()}if(a==="delpos"){T.pos.splice(+d.i,1);REGOPEN.clear()}
-  if(a==="up"&&+d.i>0){const i=+d.i;[T.pos[i-1],T.pos[i]]=[T.pos[i],T.pos[i-1]];REGOPEN.clear()}
-  save();renderReg()};
-$("nav").onclick=e=>{const b=e.target.closest("button");if(!b)return;const n=b.dataset.n;
-  [1,2,3,4].forEach(i=>{$("v"+i).classList.toggle("on",i==n)});[...$("nav").children].forEach(x=>x.classList.toggle("on",x===b));
-  $("ttl").textContent=b.lastChild.textContent;if(n==3)renderReg();if(n==1)draw();window.scrollTo(0,0)};
-$("f").onchange=async e=>{const f=e.target.files[0];if(!f)return;
-  if(typeof XLSX==="undefined"){msg("Excel読込ライブラリを取得できていません。ネット接続とブラウザを確認してください");return}
-  try{load(await f.arrayBuffer())}catch(x){msg("読み込みに失敗しました: "+x.message)}};
-$("sh").onchange=()=>parse([$("sh").value]);$("st").onchange=e=>switchStore(+e.target.value);
-const rowOf=k=>{const D=DY()[cur];return D&&D.rows.find(r=>r.k===k)};
-$("d").onchange=e=>{const o=DY()[cur];if(o)sortRows(o);setCur(e.target.value);OPEN=null;save();draw()};
-$("rows").oninput=e=>{const t=e.target,f=t.dataset.f;if(!f)return;const r=rowOf(t.dataset.r);if(!r)return;
-  r[f]=(f==="s"||f==="e")?(parseFloat(t.value)||0):t.value;save();out();
-  const h=document.querySelector('.pr[data-key="'+r.k+'"] .ph');
-  if(h){h.querySelector(".pn").textContent=r.n||"（名前未入力）";h.querySelector(".pt").textContent=num(r.s)+"-"+num(r.e);h.querySelector(".pp").textContent=posTxt(r)}};
-$("rows").onclick=e=>{const D=DY()[cur];if(!D)return;const tg=e.target;
-  const dl=tg.closest("[data-delr]");
-  if(dl){const k=dl.dataset.delr,i=D.rows.findIndex(r=>r.k===k);if(i>=0){D.del=D.del||[];D.del.push(...D.rows.splice(i,1));if(OPEN===k)OPEN=null;save();draw()}return}
-  const ch=tg.closest("[data-c]");
-  if(ch){const r=rowOf(ch.dataset.r);if(r){ensure(r);const n=ch.dataset.c,i=r.ps.indexOf(n);if(i>=0)r.ps.splice(i,1);else r.ps.push(n);save();draw()}return}
-  const tog=tg.closest("[data-tog]");if(tog)toggleRow(tog.dataset.tog)};
-$("del").onclick=e=>{const b=e.target.closest("[data-res]");if(!b)return;const D=DY()[cur];if(!D)return;
-  D.rows.push(...D.del.splice(+b.dataset.res,1));sortRows(D);save();draw()};
-$("add").onclick=()=>{const D=DY()[cur];if(!D)return;const r={n:"",s:17,e:22,ps:[],x:""},k=kid(r);
-  D.rows.push(r);OPEN=k;sortRows(D);save();draw();
-  const el=document.querySelector('[data-r="'+k+'"][data-f="n"]');if(el){el.focus();el.scrollIntoView({block:"center",behavior:"smooth"})}};
-$("v3").addEventListener("toggle",e=>{const i=e.target.dataset&&e.target.dataset.di;if(i!==undefined){if(e.target.open)REGOPEN.add(+i);else REGOPEN.delete(+i)}},true);
-[["g","g"],["pp","pp"],["tg","tg"],["nt","nt"]].forEach(([i,k])=>$(i).oninput=e=>{const D=DY()[cur];if(!D)return;
-  D[k]=k==="nt"?e.target.value:(e.target.value===""?"":+e.target.value);save();out()});
-[["lfm","ms"],["lfv","lf"],["lfn","cr"],["lft","tr"]].forEach(([i,k])=>$(i).oninput=e=>{const D=DY()[cur];if(!D)return;
-  const v=e.target.value;D[k]=v===""?"":+v;if(k==="tr")ST().tr=D[k];save();out()});
-$("lfc").onclick=()=>{const b=$("lfc");navigator.clipboard.writeText($("lfo").textContent).then(()=>{b.textContent="コピーしました";setTimeout(()=>b.textContent="コピー",1500)}).catch(()=>{b.textContent="コピーできませんでした"})};
-$("hol").onchange=e=>{const D=DY()[cur];if(!D)return;D.hol=e.target.checked;save();draw()};
-$("rst").onclick=()=>{const D=DY()[cur];if(!D||!D.orig)return;const o=JSON.parse(D.orig);D.rows=o.rows;D.tg=o.tg;D.del=[];D.ov={};OPEN=null;save();draw()};
-$("cp").onclick=()=>{const b=$("cp");navigator.clipboard.writeText($("out").textContent).then(()=>{b.textContent="コピーしました";setTimeout(()=>b.textContent="コピー",1500)}).catch(()=>{b.textContent="コピーできませんでした"})};
-const OD={ep:"https://login.microsoftonline.com/consumers/oauth2/v2.0/"};
-const MS_CLIENT_ID="9213538a-5ee5-4bba-ab29-691d334b95fe";const cid=()=>S.cid||MS_CLIENT_ID;
-const odSc=loc=>(/^https?:/i.test(loc||"")?"Files.ReadWrite.All":"Files.Read")+" offline_access";
-const redir=()=>{let p=location.pathname;if(p.endsWith("/"))p+="shift_app.html";else if(!/\.html?$/.test(p))p+=".html";return location.origin+p};
-const b64u=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
-const rnd=n=>b64u(crypto.getRandomValues(new Uint8Array(n)));
-async function odLogin(sc){const v=rnd(48),st=rnd(16),ch=b64u(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v)));
-  localStorage.setItem("od-pkce",JSON.stringify({v,st,sc}));localStorage.setItem("od-go","1");
-  location.href=OD.ep+"authorize?"+new URLSearchParams({client_id:cid(),response_type:"code",redirect_uri:redir(),response_mode:"query",scope:sc,code_challenge:ch,code_challenge_method:"S256",state:st})}
-async function tokenReq(p,sc){const r=await fetch(OD.ep+"token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({client_id:cid(),scope:sc,...p})});
-  const j=await r.json();if(!r.ok)throw new Error(j.error_description||j.error);
-  const old=JSON.parse(localStorage.getItem("od-tok")||"{}");
-  localStorage.setItem("od-tok",JSON.stringify({at:j.access_token,rt:j.refresh_token||old.rt,exp:Date.now()+j.expires_in*1000-60000,sc}))}
-async function odToken(sc){const t=JSON.parse(localStorage.getItem("od-tok")||"null");if(t&&t.sc===sc&&t.exp>Date.now())return t.at;
-  if(t&&t.rt&&t.sc===sc){try{await tokenReq({grant_type:"refresh_token",refresh_token:t.rt},sc);return JSON.parse(localStorage.getItem("od-tok")).at}catch(e){}}return null}
-async function odCallback(){const q=new URLSearchParams(location.search);if(!q.get("code")&&!q.get("error"))return false;
-  const sv=JSON.parse(localStorage.getItem("od-pkce")||"{}");history.replaceState(null,"",location.pathname);localStorage.removeItem("od-pkce");
-  if(q.get("error")){localStorage.removeItem("od-go");msg("Microsoftのログインに失敗しました: "+(q.get("error_description")||q.get("error")));return false}
-  if(q.get("state")!==sv.st){localStorage.removeItem("od-go");msg("ログインの確認に失敗しました。もう一度試してください");return false}
-  try{await tokenReq({grant_type:"authorization_code",code:q.get("code"),redirect_uri:redir(),code_verifier:sv.v},sv.sc);return true}
-  catch(e){localStorage.removeItem("od-go");msg("ログインの処理に失敗しました: "+e.message);return false}}
-function odBase(loc){loc=loc.trim();
-  if(/^https?:/i.test(loc))return "https://graph.microsoft.com/v1.0/shares/u!"+btoa(unescape(encodeURIComponent(loc))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")+"/driveItem";
-  return "https://graph.microsoft.com/v1.0/me/drive/root:"+("/"+loc.replace(/^\/+/,"")).split("/").map(encodeURIComponent).join("/")+":"}
-async function odLoad(auto){const T=ST();
-  if(auto&&(!T.od||!cid()||typeof XLSX==="undefined"))return;
-  if(!cid()){msg("登録情報の「OneDrive連携」に、クライアントIDを入力してください");return}
-  if(!T.od){msg("登録情報の店舗欄に、OneDriveのファイル(共有リンクかパス)を入力してください");return}
-  const sc=odSc(T.od),tk=await odToken(sc);if(!tk){if(auto){msg("OneDriveのログインが切れています。「OneDriveから読み込む」を押してください");return}msg("Microsoftのログイン画面に移動します…");setTimeout(()=>odLogin(sc),400);return}
-  msg("OneDriveから読み込み中…");
-  const base=odBase(T.od),H={Authorization:"Bearer "+tk};
-  try{let buf;
-    try{const r=await fetch(base+"/content",{headers:H});if(!r.ok)throw new Error("HTTP "+r.status);buf=await r.arrayBuffer()}
-    catch(e1){if(String(e1.message).startsWith("HTTP"))throw e1;
-      const r=await fetch(base,{headers:H});if(!r.ok)throw new Error("HTTP "+r.status);const j=await r.json();
-      const d=await fetch(j["@microsoft.graph.downloadUrl"]);if(!d.ok)throw new Error("HTTP "+d.status);buf=await d.arrayBuffer()}
-    load(buf)}
-  catch(e){const m=String(e.message);
-    if(m==="HTTP 401"){localStorage.removeItem("od-tok");msg("ログインの有効期限が切れました。もう一度ボタンを押してください")}
-    else if(m==="HTTP 404"||m==="HTTP 403")msg("ファイルが見つからない、または開く権限がありません("+m+")。ファイルの場所と共有設定を確認してください");
-    else msg("読み込みに失敗しました: "+m)}}
-$("od").onclick=()=>odLoad();
-{const now=new Date(),sel=S.sel||{m:now.getMonth()+1,h:now.getDate()<=15?"前半":"後半"};
- $("mm").innerHTML=[...Array(12)].map((_,i)=>`<option value="${i+1}">${i+1}月</option>`).join("");$("mm").value=sel.m;$("hf").value=sel.h;
- $("mm").onchange=$("hf").onchange=()=>{S.sel={m:+$("mm").value,h:$("hf").value};save();if(WB)pick()}}
+/* ================================================================
+   JavaScript(動作)
 
-let SH=null,shT=null,IMP=null,armedImp=false;
-const unb64u=s=>{s=s.replace(/-/g,"+").replace(/_/g,"/");while(s.length%4)s+="=";return Uint8Array.from(atob(s),c=>c.charCodeAt(0))};
-async function pack(o){const raw=new TextEncoder().encode(JSON.stringify(o));
-  if(typeof CompressionStream!=="undefined"){const cs=new Blob([raw]).stream().pipeThrough(new CompressionStream("deflate-raw"));return "1"+b64u(await new Response(cs).arrayBuffer())}
-  return "0"+b64u(raw)}
-async function unpack(p){let bytes;try{bytes=unb64u(p.slice(1))}catch(e){throw new Error("データが壊れています(途中で切れた可能性があります)")}
-  try{if(p[0]==="1"){if(typeof DecompressionStream==="undefined")throw new Error("この端末のブラウザは圧縮形式に対応していません。別のブラウザで開いてください");
-      const ds=new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));return JSON.parse(new TextDecoder().decode(await new Response(ds).arrayBuffer()))}
-    if(p[0]==="0")return JSON.parse(new TextDecoder().decode(bytes))}
-  catch(e){if(/対応していません/.test(e.message))throw e;throw new Error("データが壊れています(途中で切れた可能性があります)")}
-  throw new Error("店舗情報の形式ではありません")}
-const cl=(s,n=60)=>String(s==null?"":s).replace(/[<>"'&`\\]/g,"").slice(0,n);
-const nu=(x,d=0)=>Number.isFinite(+x)?+x:d;
-function sane(o){if(!o||o.t!=="shift-store")throw new Error("店舗情報の形式ではありません");
-  const R=["normal","parent","child","reg","free"],zn=x=>x==null||x===""?null:nu(x);
-  const pos=(Array.isArray(o.pos)?o.pos:[]).slice(0,60).map(p=>({n:cl(p.n),role:R.includes(p.role)?p.role:"normal",parent:cl(p.parent),kw:cl(p.kw),ab:cl(p.ab,10),wk:zn(p.wk),fs:zn(p.fs),sat:zn(p.sat),...["cwk","cfs","csat"].reduce((a,k)=>p[k]==null?a:{...a,[k]:cl(p[k],8)},{})}));
-  const emps=(Array.isArray(o.emps)?o.emps:[]).slice(0,100).map(e=>({n:cl(e.n),v:nu(e.v)}));
-  const skill={};Object.keys(o.skill||{}).slice(0,300).forEach(k=>{const d=o.skill[k]||{},r={};Object.keys(d).slice(0,60).forEach(q=>{if(Number.isFinite(+d[q]))r[cl(q)]=+d[q]});skill[cl(k)]=r});
-  return{name:cl(o.name)||"店舗",wage:nu(o.wage),daily:nu(o.daily),dv:nu(o.dv,3),emps,pos,skill,od:String(o.od||"").replace(/[<>"'`\\]/g,"").slice(0,600)}}
-const shareObj=od=>{const T=ST();return{v:1,t:"shift-store",name:T.name,wage:T.wage,daily:T.daily,emps:T.emps,pos:T.pos,...(od&&T.od?{od:T.od}:{})}};
-function shRefresh(){clearTimeout(shT);SH=null;shT=setTimeout(async()=>{try{const p=await pack(shareObj($("shod")&&$("shod").checked));SH={url:location.origin+location.pathname+"#share="+p,txt:"SHIFTv1."+p}}catch(e){}},150)}
-async function shRead(text){text=(text||"").trim();let p;const i=text.indexOf("#share=");
-  if(i>=0)p=text.slice(i+7).split(/\s/)[0];else if(text.indexOf("SHIFTv1.")===0)p=text.slice(8).split(/\s/)[0];else p=text.replace(/\s+/g,"");
-  if(!p)throw new Error("貼り付けた内容が空です");if(p.length>300000)throw new Error("データが大きすぎます");
-  IMP=sane(await unpack(p));armedImp=false;renderImp()}
-function renderImp(){const b=$("impbox");if(!b)return;if(!IMP){b.innerHTML="";return}const I=IMP;
-  b.innerHTML=`<div class="card"><b>${I.name}</b><br><small>時給 ${I.wage}円 / 固定 ${I.daily}円 / 社員 ${I.emps.length}人 / ポジション ${I.pos.length}個${I.od?" / OneDriveの場所あり":""}</small>
-  <div class="row"><button data-a="impover">${armedImp?"本当に上書きする":"現在の店舗「"+ST().name+"」に上書き"}</button><button data-a="impnew" class="ghost">新しい店舗として追加</button><button data-a="impno" class="ghost">やめる</button></div></div>`}
-function shFallback(t){const x=$("shin");if(x){x.value=t;x.focus();x.select()}}
-function cpy(t,msg){const m=$("shmsg"),ok=()=>{if(m)m.textContent=msg},ng=()=>{if(m)m.textContent="自動でコピーできませんでした。上の入力欄に表示したので、全選択してコピーしてください";shFallback(t)};
-  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(ok).catch(ng);else ng()}
-function shAct(a){const m=t=>{const e=$("shmsg");if(e)e.textContent=t};
-  if(a==="shlink"||a==="shtext"||a==="shnative"){if(!SH){m("準備中です。少し待ってからもう一度押してください");shRefresh();return}
-    if(a==="shlink")return cpy(SH.url,"リンクをコピーしました。LINEなどに貼り付けて送ってください");
-    if(a==="shtext")return cpy(SH.txt,"テキストをコピーしました。LINEなどに貼り付けて送ってください");
-    if(navigator.share)navigator.share({title:"店舗情報",text:SH.url}).catch(()=>{});else cpy(SH.url,"この端末には共有メニューが無いため、リンクをコピーしました");return}
-  if(a==="shread"){shRead($("shin").value).then(()=>m("読み取りました。内容を確認して、取り込み方を選んでください")).catch(e=>{IMP=null;renderImp();m("読み取れませんでした: "+e.message)});return}
-  if(a==="impno"){IMP=null;armedImp=false;renderImp();return}
-  if(a==="impnew"&&IMP){const I=IMP,id=Date.now();S.stores.push({id,name:I.name,wage:I.wage,daily:I.daily,dv:I.dv,emps:I.emps,pos:I.pos,skill:I.skill,od:I.od,days:{},cur:null});IMP=null;armedImp=false;switchStore(id);setTimeout(()=>m("新しい店舗として追加しました"),0);return}
-  if(a==="impover"&&IMP){if(!armedImp){armedImp=true;renderImp();return}const T=ST(),I=IMP;Object.assign(T,{wage:I.wage,daily:I.daily,emps:I.emps,pos:I.pos});if(I.od)T.od=I.od;IMP=null;armedImp=false;save();renderReg();setTimeout(()=>m("現在の店舗に取り込みました"),0)}}
-async function shBoot(){if(location.hash.indexOf("#share=")!==0)return;const h=location.hash;history.replaceState(null,"",location.pathname+location.search);
-  let err="";try{await shRead(h)}catch(e){IMP=null;err=e.message}
-  document.querySelector('#nav [data-n="3"]').click();
-  setTimeout(()=>{const m=$("shmsg");if(m)m.textContent=err?"リンクの内容を読み取れませんでした: "+err:"受け取った店舗情報を読み取りました。内容を確認して、取り込み方を選んでください";const b=$("impbox");if(b&&!err)b.scrollIntoView({block:"center"})},50)}
-cur=ST().cur;fillStores();init();renderReg();shBoot();window.addEventListener("hashchange",shBoot);
-const HADCB=/[?&](code|error)=/.test(location.search);
-odCallback().then(ok=>{if(ok&&localStorage.getItem("od-go")){localStorage.removeItem("od-go");odLoad()}else if(!HADCB&&S.auto!==false)odLoad(true)});
-if(typeof XLSX==="undefined")msg("Excel読込ライブラリを取得できていません(ネット接続を確認)");
+   ■ 保存データ S の形(ブラウザの localStorage に JSON で保存)
+     S = {
+       cs: 現在の店舗id,  sel: {m:月, h:"前半"|"後半"},  cid: OneDriveクライアントID(任意),  auto: 起動時自動読込(false=オフ),
+       stores: [{
+         id, name, wage(時給), daily(毎日の固定人件費), tr(着地の目標率の初期値),
+         emps: [{n:名前, v:1日の人件費}],            // 社員
+         pos:  [{n:名前, role, parent, kw, ab, cwk, cfs, csat}],   // ポジションと定数
+         od:   OneDriveのファイル(共有リンクかパス),   src: 読み込んだシート名,
+         days: { "10/5": {                              // 日ごとのシフト
+                   wd:曜日, hol:祝日, tg:売上目標, g:予約組, pp:予約名, nt:備考,
+                   ms:中間売上, lf:着地売上予想, cr:現在の人件費率, tr:目標率,
+                   rows: [{n:名前, s:開始, e:終了, ps:[ポジション], x:その他, br:[{s,e}休憩], k:行の識別子}],
+                   del:  [削除した人(rowsと同じ形)],
+                   orig: Excelから読んだ時点の内容(「Excelの内容に戻す」と編集判定に使う) } },
+         cur: 最後に開いていた日
+       }]
+     }
+   ================================================================ */
+
+
+/* ================================================================
+   S1. 基本の道具(どこからでも使う小さな関数)
+   ================================================================ */
+
+const KEY = "shift-s2";                 // localStorage のキー(変えると保存データが読めなくなる)
+const WD  = "日月火水木金土";              // 曜日(Date.getUTCDay() の番号で引く)
+const $   = id => document.getElementById(id);   // 部品をidで取る近道
+
+// 新しい店舗の初期データ(店舗が1つも無い時に使う)
+const newStore = () => ({ id:1, name:"店舗1", wage:0, daily:0, dv:3, emps:[], pos:[], skill:{}, days:{}, cur:null });
+
+let S = null;          // 全データ(上の形)
+let WB;                // 読み込み中のExcel(SheetJSのworkbook)
+let cur = null;        // 今表示している日("10/5" の形)
+let armed = false;     // 店舗削除の「もう一度押すと削除」確認中か
+let OPEN = null;       // 編集欄が開いている人の行のキー(1人だけ開ける)
+const REGOPEN = new Set();   // 登録画面でポジションの「詳細」を開いているカード番号
+
+// ---- 保存データの読み込み(壊れていたら初期化) ----
+try { S = JSON.parse(localStorage.getItem(KEY)) } catch (e) {}
+if (!S || !S.stores) S = { stores:[newStore()], cs:1 };
+// 古いデータ対応: ポジションの略称が未設定なら、ホールだけ「ホ」にする
+S.stores.forEach(T => T.pos.forEach(p => { if (p.ab === undefined) p.ab = p.n === "ホール" ? "ホ" : ""; }));
+
+// 保存(変更のたびに呼ぶ)
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)) } catch (e) {} };
+
+const ST     = () => S.stores.find(x => x.id === S.cs) || S.stores[0];   // 現在の店舗
+const DY     = () => ST().days;                                          // 現在の店舗の日ごとのデータ
+const setCur = k => { cur = k; ST().cur = k; };                          // 表示する日を変える
+
+// 日の種類: "sat"=土 / "fs"=金・日・祝 / "wk"=平日(ポジションの定数を選ぶのに使う)
+const dtype = D => D.wd === "土" ? "sat" : (D.hol || D.wd === "金" || D.wd === "日") ? "fs" : "wk";
+
+const num = x => String(+x);                                    // 数字を表示用に(24.0 → "24")
+const nn  = v => v === "" || v == null || isNaN(+v) ? null : +v; // 空欄・数字でない → null
+const nz  = s => (s || "").normalize("NFKC").replace(/\s+/g, ""); // 全角半角・空白をそろえて比べる用
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g,   // HTMLに入れる文字を安全にする
+  c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+
+// 文字の表示幅(全角=2、半角=1)。出力の列をそろえるために使う
+const wid = s => [...s].reduce((a, c) => a + (c.charCodeAt(0) > 255 ? 2 : 1), 0);
+const pad = (s, w) => s + " ".repeat(Math.max(w - wid(s), 0));   // 表示幅 w まで空白で埋める
+
+// "pos.0.cwk" のような道具で、深い場所の値を書き換える(登録画面の入力用)
+const setP = (o, path, v) => {
+  const k = path.split(".");
+  let t = o;
+  for (let i = 0; i < k.length - 1; i++) t = t[k[i]];
+  t[k[k.length - 1]] = v;
+};
+
+// 行の識別子(画面上の行とデータを結びつける印)。無ければ作る
+const kid = r => r.k || (r.k = Math.random().toString(36).slice(2, 8));
+
+// 開始時刻の早い順に並べる(人の追加・戻す・編集欄の開閉・日付変更のときに呼ぶ)
+const sortRows = D => { D.rows.sort((a, b) => a.s - b.s); };
+
+
+/* ================================================================
+   S2. ポジション(名前・定数・略称・人数チェック)
+   ================================================================ */
+
+// ポジションを探すキーワード = ポジション名 + 登録した「判定語」
+const kws = p => [p.n, ...String(p.kw || "").split(/[,、\s]+/)].filter(Boolean);
+
+// 古い形式の自由記述(r.p)から、ポジションを自動判定して r.ps / r.x に入れる(ps があれば何もしない)
+const prep = t => (t || "").normalize("NFKC").replace(/(\d)[.,、・](\d)階/g, "$1階$2階");
+function ensure(r) {
+  if (r.ps) return;
+  const T = ST(), t = prep(r.p), found = [];
+  T.pos.forEach(p => {
+    const ix = Math.min(...kws(p).map(k => { const j = t.indexOf(k); return j < 0 ? 1e9 : j; }));
+    if (ix < 1e9) found.push([ix, p.n]);
+  });
+  found.sort((a, b) => a[0] - b[0]);       // 文中で先に出てくる順
+  r.ps = found.map(x => x[1]);
+  r.x  = r.ps.length ? "" : (r.p || "");   // 判定できなければ「その他」に入れる
+}
+
+// 出力用のポジション表記。複数担当は略称をスペースなしでつなぐ(例: 刺ホ)。「その他」は後ろに付ける
+function posTxt(r) {
+  ensure(r);
+  const ab = n => {                         // 略称(未設定なら名前そのまま。ホールだけ既定で「ホ」)
+    const q = ST().pos.find(p => p.n === n);
+    return q ? (q.ab !== undefined ? q.ab : (n === "ホール" ? "ホ" : "")) || n : n;
+  };
+  return [r.ps.length > 1 ? r.ps.map(ab).join("") : r.ps.join(""), r.x].filter(Boolean).join(" ");
+}
+
+// 定数(人数)の文字列。新しい項目(cwk/cfs/csat)が無い古いポジションは、使う日なら "1" とみなす
+const cnt = (p, t) => { const v = p["c" + t]; return v === undefined || v === null ? (p[t] != null ? "1" : "") : String(v); };
+
+// 定数の文字列を {lo, hi} にする。"1"→{1,1}、"1-2"→{1,2}、"0"→目安なし、""→使わない(null)
+function rng(p, t) {
+  const s = cnt(p, t).normalize("NFKC").replace(/[~〜～ー–—－]/g, "-").replace(/\s+/g, "");
+  if (s === "") return null;
+  const m = s.match(/^(\d+)(?:-(\d+))?$/);
+  if (!m) return null;
+  const a = +m[1], b = m[2] !== undefined ? +m[2] : a;
+  if (m[2] === undefined && a === 0) return { lo:0, hi:Infinity };
+  return { lo:Math.min(a, b), hi:Math.max(a, b) };
+}
+
+// その日の種類 t で使うポジション一覧。「子」を使う日は、親は表示しない
+function avail(T, t) {
+  return T.pos.filter(p => p.n && rng(p, t) &&
+    !(p.role === "parent" && T.pos.some(c => c.role === "child" && c.parent === p.n && rng(c, t))));
+}
+
+// ポジションごとの人数バッジのHTML(足りない=⚠ / 多い=▲)
+function board(rows, D) {
+  const T = ST(), t = dtype(D);
+  if (!T.pos.length) return "<small>登録情報でポジションを登録すると、ここに人数が出ます</small>";
+  rows.forEach(r => ensure(r));
+  return avail(T, t).map(p => {
+    const g = rng(p, t);                                     // 定数
+    const c = rows.filter(r => r.ps.includes(p.n)).length;   // 今の人数
+    const lo = c < g.lo, hi = c > g.hi;
+    const std = g.hi === Infinity ? "" : "/" + (g.lo === g.hi ? g.lo : g.lo + "-" + g.hi);
+    return `<span class="bd ${lo ? "lo" : hi ? "hi" : "ok"}">${lo ? "⚠ " : hi ? "▲ " : ""}${esc(p.n)} ${c}${std}</span>`;
+  }).join("");
+}
+
+
+/* ================================================================
+   S3. 休憩と時間(★休憩の扱いを変えたいときはここ)
+
+   休憩は人ごとに r.br = [{s:開始, e:終了}, ...] で持つ(複数回OK)。
+   ・働く時間(H)と人件費は「出勤〜退勤 − 休憩」で計算する。
+   ・社員の月累計も、休憩を引いた時間で数える。
+   ================================================================ */
+
+// 休憩の合計時間(終了が開始以前のものは数えない)
+const brHours = r => (r.br || []).reduce((a, b) => a + Math.max(0, b.e - b.s), 0);
+
+// 実働時間 = 退勤 − 出勤 − 休憩(マイナスにはしない)
+const netHours = r => Math.max(0, r.e - r.s - brHours(r));
+
+// 時間の表示(1 → "1h"、0.5 → "0.5h")
+const hTxt = x => num(+x.toFixed(2)) + "h";
+
+// 人の行の見出しに出す時間("17-22" 、休憩があれば "17-22 休1h")
+const ptText = r => {
+  const h = brHours(r);
+  return num(r.s) + "-" + num(r.e) + (h > 0 ? " 休" + hTxt(h) : "");
+};
+
+// 休憩を1つ追加する。len=長さ(1 または 0.5)。
+// 開始時刻の決め方: すでに休憩があれば最後の休憩の終わり、無ければ勤務の真ん中あたり(0.5刻み)
+function addBreak(r, len) {
+  r.br = r.br || [];
+  const last = r.br.length ? r.br[r.br.length - 1].e : null;
+  let s = last !== null && last + len <= r.e ? last : Math.round(((r.s + r.e) / 2 - len / 2) * 2) / 2;
+  s = Math.max(r.s, Math.min(s, r.e - len));
+  r.br.push({ s, e: s + len });
+  r.br.sort((a, b) => a.s - b.s);
+}
+
+
+/* ================================================================
+   S4. 人の行の表示(1人=1行。タップで編集欄が開く)
+   ================================================================ */
+
+// ポジション選択ボタン(チップ)。選んだ順に ①②… が付く
+function chips(r, k) {
+  ensure(r);
+  return `<div class="row">` + avail(ST(), dtype(DY()[cur])).map(p => {
+    const i = r.ps.indexOf(p.n);
+    return `<button class="chip ${i >= 0 ? "on" : "off"}" data-r="${k}" data-c="${esc(p.n)}">${esc(p.n)}${i >= 0 && r.ps.length > 1 ? ("①②③④⑤⑥⑦⑧⑨"[i] || "") : ""}</button>`;
+  }).join("") + `</div>`;
+}
+
+// 休憩の編集欄。1回ごとに「開始〜終了」と時間数が出る。＋1h / ＋0.5h で追加
+function breaksHTML(r, k) {
+  const list = (r.br || []).map((b, i) =>
+    `<div class="row"><span class="brl">休憩</span>` +
+    `<input class="t" type="number" step="0.5" inputmode="decimal" value="${b.s}" data-r="${k}" data-bi="${i}" data-f="bs"> 〜 ` +
+    `<input class="t" type="number" step="0.5" inputmode="decimal" value="${b.e}" data-r="${k}" data-bi="${i}" data-f="be">` +
+    `<span class="brh">${hTxt(Math.max(0, b.e - b.s))}</span>` +
+    `<button class="ghost" data-delbr="${k}" data-i="${i}">×</button></div>`).join("");
+  return list + `<div class="row"><small>休憩を追加</small>` +
+    `<button class="ghost" data-addbr="${k}" data-len="1">＋1h</button>` +
+    `<button class="ghost" data-addbr="${k}" data-len="0.5">＋0.5h</button></div>`;
+}
+
+// 1人ぶんのHTML。閉じている時は「名前 / 時間 / ポジション」だけ。開いている時は編集欄も出す
+function rowHTML(r) {
+  const k = kid(r), open = OPEN === k;
+  const isEmp = ST().emps.some(e => e.n && e.n === r.n);      // 社員なら橙色の帯
+  ensure(r);
+  const head =
+    `<div class="ph" data-tog="${k}">` +
+      `<span class="pn">${esc(r.n) || "（名前未入力）"}</span>` +
+      `<span class="pt">${ptText(r)}</span>` +
+      `<span class="pp">${esc(posTxt(r))}</span>` +
+    `</div>`;
+  const editor = !open ? "" :
+    `<div class="pe">` +
+      // 名前・出勤・退勤
+      `<div class="row">` +
+        `<input class="n" placeholder="名前" value="${esc(r.n)}" data-r="${k}" data-f="n">` +
+        `<input class="t" type="number" step="0.5" inputmode="decimal" value="${r.s}" data-r="${k}" data-f="s"> 〜 ` +
+        `<input class="t" type="number" step="0.5" inputmode="decimal" value="${r.e}" data-r="${k}" data-f="e">` +
+      `</div>` +
+      breaksHTML(r, k) +                                   // 休憩
+      chips(r, k) +                                        // ポジション
+      // その他(自由記述)・外す・閉じる
+      `<div class="row">` +
+        `<input style="flex:1 1 120px" placeholder="その他（自由記述）" value="${esc(r.x)}" data-r="${k}" data-f="x">` +
+        `<button class="del" data-delr="${k}">外す</button>` +
+        `<button class="ghost" data-tog="${k}">閉じる</button>` +
+      `</div>` +
+    `</div>`;
+  return `<div class="pr${isEmp ? " emp" : ""}${open ? " open" : ""}" data-key="${k}">${head}${editor}</div>`;
+}
+
+// 行の開閉。開閉のタイミングで時間順に並べ直す
+function toggleRow(k) {
+  const D = DY()[cur];
+  if (!D) return;
+  OPEN = OPEN === k ? null : k;
+  sortRows(D); save(); draw();
+  const el = OPEN ? document.querySelector('.pr[data-key="' + k + '"]') : null;
+  if (el) el.scrollIntoView({ block:"nearest", behavior:"smooth" });
+}
+
+
+/* ================================================================
+   S5. Excelの読み込み
+   Excelの形: 1行目=日付(2列ずつ) / 3行目=売上目標 / 9行目以降=B列に名前、日付の2列に開始・終了
+   ================================================================ */
+
+let PREFTODAY = true;   // 起動後の最初の読込だけ、今日の日付を優先して開く
+
+// メッセージ表示(読み込み欄を開いて見せる)
+const msg = t => { $("msg").textContent = t; $("ld").open = true; };
+
+// Excelファイル(バイト列)を読んでシートを探す
+function load(buf) {
+  WB = XLSX.read(buf, { type:"array", cellDates:true });
+  pick();
+}
+
+// 月 m・前半/後半 hf に当てはまるシートを探す。
+// この店舗名を含むシートがあればそれを優先、無ければ「10月前半」で始まるシート
+function sheetFor(m, hf) {
+  const N = WB.SheetNames, sn = nz(ST().name);
+  const c     = N.filter(n => new RegExp("(^|\\D)" + m + "月" + hf).test(nz(n)));
+  const mine  = c.filter(n => sn && nz(n).includes(sn));
+  const plain = c.filter(n => new RegExp("^" + m + "月" + hf).test(nz(n)));
+  return { c, use: mine.length ? mine : plain };
+}
+
+// 選んだ月の前半・後半の両方を読み込む(社員の月累計を出すため)
+function pick() {
+  const N = WB.SheetNames, m = $("mm").value, hf = $("hf").value, oh = hf === "前半" ? "後半" : "前半";
+  const sh = $("sh"), A = sheetFor(m, hf), B = sheetFor(m, oh);
+  sh.innerHTML = N.map(n => `<option>${n}</option>`).join("");
+  sh.style.display = N.length > 1 ? "" : "none";
+  if (A.use.length) {
+    sh.value = A.use[0];
+    parse(B.use.length ? [A.use[0], B.use[0]] : [A.use[0]]);
+    if (A.use.length > 1) msg($("msg").textContent + "(同じ名前に当てはまるシートが" + A.use.length + "枚あります。上の選択で切り替えられます)");
+  } else if (A.c.length) {
+    sh.value = A.c[0];
+    msg("「" + m + "月" + hf + "」に当てはまるシートは、別の名前が付いたものだけでした(" + A.c.join("、") + ")。この店舗のシートか確認して、上の選択から選んでください");
+  } else {
+    msg("「" + m + "月" + hf + "」に当てはまるシートがありません。上の選択から直接選べます");
+  }
+}
+
+// 1枚のシートを読んで、日ごとのデータ {"10/5": {...}} にする。日付が無ければ null
+function readSheet(name) {
+  const ws = WB.Sheets[name];
+  const a = XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:null });   // 2次元配列にする
+  const days = {};
+  (a[0] || []).forEach((v, c) => {                       // 1行目の日付セルを探す
+    if (!(v instanceof Date)) return;
+    const d = new Date(v.getTime() + 12 * 36e5);         // 時差でずれないよう12時間足す
+    const k = (d.getUTCMonth() + 1) + "/" + d.getUTCDate();
+    const rows = [];
+    for (let r = 8; r < a.length; r++) {                 // 9行目から下が名簿
+      const n = a[r][1], s = a[r][c], e = a[r][c + 1];   // B列=名前、c列=開始、c+1列=終了
+      if (!n || n === "ホール" || n === "キッチン" || typeof s !== "number" || typeof e !== "number") continue;
+      rows.push({ n:String(n).trim(), s, e, ps:[], x:"", br:[] });
+    }
+    rows.sort((x, y) => x.s - y.s);
+    const tg = parseInt(String(a[2] && a[2][c] || "").replace(/,/g, "")) || "";   // 3行目=売上目標
+    days[k] = { wd:WD[d.getUTCDay()], rows, g:"", pp:"", tg, nt:"", orig:JSON.stringify({ rows, tg }) };
+  });
+  return Object.keys(days).length ? days : null;
+}
+
+// ---- 読み込み時に「自分で編集した日」を消さないための仕組み ----
+
+// 人の一覧を比べるための文字列(名前・開始・終了だけ)
+const rk = rows => JSON.stringify(rows.map(r => [r.n, r.s, r.e]).sort());
+
+// その日が、Excelを読んだ時点から編集されているか?(されていれば再読込しても上書きしない)
+function touched(E) {
+  let o;
+  try { o = JSON.parse(E.orig) } catch (e) { return true; }
+  return rk(E.rows) !== rk(o.rows)                                  // 人・時間が変わった
+    || (+E.tg || 0) !== (+o.tg || 0)                                // 売上が変わった
+    || E.rows.some(r => (r.ps && r.ps.length) || r.x || (r.br && r.br.length))   // ポジション・その他・休憩を入れた
+    || !!(E.del && E.del.length)                                    // 人を外した
+    || !!(E.g || E.pp || E.nt || E.hol || E.ms || E.lf || E.cr || E.tr)   // 予約・備考・祝日・着地予想を入れた
+    || Object.keys(E.ov || {}).length > 0;
+}
+
+// 新しく読んだ日(nd)を、保存済みの日に混ぜる。
+// ・編集済みの日 → 保存した内容を残す(Excelが変わっていれば、その日付を xl に記録)
+// ・未編集の日   → Excelの最新に置き換える
+// ・同じ月の、読み込んでいない半月ぶん(前半/後半)は残す。別の月は捨てる
+function mergeDays(nd) {
+  const T = ST(), old = T.days || {};
+  const mons = new Set(Object.keys(nd).map(k => k.split("/")[0]));
+  const o = {}, kept = [], xl = [];
+  Object.keys(old).forEach(k => { if (mons.has(k.split("/")[0])) o[k] = old[k]; });
+  Object.keys(nd).forEach(k => {
+    const E = o[k];
+    if (E && touched(E)) {
+      kept.push(k);
+      if (E.orig !== nd[k].orig) { xl.push(k); E.orig = nd[k].orig; }
+    } else {
+      o[k] = nd[k];
+    }
+  });
+  // 月→日の順に並べ直す
+  const ks = Object.keys(o).sort((a, b) => {
+    const [x, y] = a.split("/").map(Number), [p, q] = b.split("/").map(Number);
+    return x - p || y - q;
+  });
+  T.days = Object.fromEntries(ks.map(k => [k, o[k]]));
+  return { kept, xl };
+}
+
+// 指定のシート(複数可)を読んで、保存データに混ぜて、画面を更新する
+function parse(names) {
+  const nd = {};
+  let fk = null, ok = false;                              // fk=最初の日、ok=読めたか
+  names.forEach(n => {
+    const d = readSheet(n);
+    if (!d) return;
+    ok = true;
+    if (fk === null) fk = Object.keys(d)[0];
+    Object.assign(nd, d);
+  });
+  if (!ok) { msg("「" + names[0] + "」に日付の行が見つかりません"); return; }
+
+  const T = ST(), src = names.join("・"), newSrc = T.src !== src;
+  const r = mergeDays(nd);
+  const now = new Date(), today = (now.getMonth() + 1) + "/" + now.getDate();
+  T.src = src; OPEN = null;
+
+  // どの日を開くか: 最初の読込は今日(あれば) / シートが変わったら先頭 / それ以外は今の日のまま
+  if (PREFTODAY && T.days[today]) setCur(today);
+  else if (!cur || !T.days[cur] || newSrc) setCur(fk);
+  PREFTODAY = false;
+  save();
+
+  $("msg").textContent = src + ": " + Object.keys(T.days).length + "日分を読み込みました" +
+    (r.kept.length ? "。編集済みの" + r.kept.length + "日分は、保存した内容のままにしています" : "");
+  init();
+  if (r.xl.length) {
+    msg($("msg").textContent + "。Excel側も変わっていた日: " + r.xl.slice(0, 6).join("、") + (r.xl.length > 6 ? "など" : "") +
+      "(その日の「削除した人」の中の「Excelの内容に戻す」で最新を反映できます)");
+  }
+}
+
+
+/* ================================================================
+   S6. 画面の描画とシフトの出力
+   ================================================================ */
+
+// 店舗の選択肢を作り直す(シフト画面と登録画面の両方)
+function fillStores() {
+  const o = S.stores.map(s => `<option value="${s.id}" ${s.id === S.cs ? "selected" : ""}>${s.name}</option>`).join("");
+  $("st").innerHTML = o;
+  if ($("rs")) $("rs").innerHTML = o;
+  $("sn").textContent = ST().name;
+}
+
+// 店舗を切り替える
+function switchStore(id) {
+  S.cs = id; cur = ST().cur;
+  save(); fillStores(); init(); renderReg();
+}
+
+// 日付の選択肢と読み込み欄の見出しを作り直して、画面を描く
+function init() {
+  const T = ST(), k = Object.keys(DY());
+  if (!cur || !DY()[cur]) setCur(k[0] || null);
+  $("d").innerHTML = k.map(x => `<option value="${x}" ${x === cur ? "selected" : ""}>${x}(${DY()[x].wd})</option>`).join("");
+  $("lds").textContent = k.length ? `${T.src || "読み込み済み"}・${k.length}日分` : "Excelを読み込む";
+  $("ld").open = !k.length;          // 読み込み済みなら折りたたむ
+  draw();
+}
+
+// 選んでいる日の画面全体を描く(人の一覧・削除リスト・入力欄・出力)
+function draw() {
+  const D = DY()[cur];
+  if (!D) {                           // 日が無い(未読込)なら空にする
+    ["rows", "pos", "del"].forEach(i => $(i).innerHTML = "");
+    $("out").textContent = ""; $("lb").textContent = ""; $("dn").textContent = "";
+    return;
+  }
+  D.del = D.del || [];
+  $("hol").checked = !!D.hol;
+  $("rows").innerHTML = D.rows.map(rowHTML).join("") || '<div class="empty">人員がいません。「＋ 人を追加」で入れてください</div>';
+  $("dn").textContent = D.del.length ? `(${D.del.length})` : "";
+  $("del").innerHTML = D.del.map((r, i) =>
+    `<div class="drow"><span>${esc(r.n) || "（名前未入力）"} ${ptText(r)} ${esc(posTxt(r))}</span><button class="ghost" data-res="${i}">戻す</button></div>`
+  ).join("") || "<small>なし</small>";
+
+  // 予約・売上・備考・着地予想の入力欄に、保存済みの値を入れる
+  $("g").value = D.g; $("pp").value = D.pp; $("tg").value = D.tg; $("nt").value = D.nt;
+  $("lfm").value = D.ms == null ? "" : D.ms;
+  $("lfv").value = D.lf == null ? "" : D.lf;
+  $("lfn").value = D.cr == null ? "" : D.cr;
+  $("lft").value = D.tr != null && D.tr !== "" ? D.tr : (ST().tr == null ? "" : ST().tr);   // 目標率は日ごと、無ければ店舗の前回値
+  out();
+}
+
+// ★シフトの出力文面を作る(出力の形を変えたいときはここ)
+//   1行目 : 10/5(月)  店舗名
+//   人ごと: 名前  出勤-退勤  ポジション
+//   休憩  : 休  休憩開始-休憩終了  ○h        (休憩を設定した人だけ、その人の下に)
+//   まとめ: 19組81名  55.5H  50万            (H=アルバイトの実働合計。休憩を引く)
+//   最後  : 22%   備考                      (22% = 人件費 ÷ 売上目標)
+function out() {
+  const T = ST(), D = DY()[cur];
+  if (!D) return;
+  const rows = [...D.rows].sort((x, y) => x.s - y.s);
+  const nw = Math.max(8, ...rows.map(r => wid(r.n))) + 2;   // 名前の列の幅
+  const wage = +T.wage || 0;
+  let h = 0;                          // アルバイトの実働合計(H)
+  let labor = +T.daily || 0;          // 人件費(毎日の固定費から積み上げる)
+  const L = [`${cur}(${D.wd})  ${T.name}`];
+
+  rows.forEach(r => {
+    const emp = T.emps.find(x => x.n === r.n);     // 社員か?
+    const w = netHours(r);                          // 実働(休憩を引いた時間)
+    if (emp) labor += +emp.v;                       // 社員 → 1日の人件費を足す(時間には数えない)
+    else { h += w; labor += w * wage; }             // アルバイト → 実働×時給
+    L.push((pad(r.n, nw) + pad(num(r.s) + "-" + num(r.e), 12) + posTxt(r)).trimEnd());
+    // 休憩の行(開始の早い順)
+    (r.br || []).filter(b => b.e > b.s).sort((a, b) => a.s - b.s).forEach(b => {
+      L.push(pad("休", nw) + pad(num(b.s) + "-" + num(b.e), 12) + hTxt(b.e - b.s));
+    });
+  });
+
+  const m = [];
+  if (D.g || D.pp) m.push(`${D.g || 0}組${D.pp || 0}名`);
+  m.push(num(h) + "H");
+  if (D.tg) m.push(num(+(D.tg / 1e4).toFixed(1)) + "万");
+  L.push(m.join("  "));
+
+  const t = [];
+  if (D.tg) t.push(Math.round(labor / D.tg * 100) + "%");
+  if (D.nt) t.push(D.nt);
+  if (t.length) L.push(t.join("   "));
+
+  lfRender(lfInfo(labor, D, wage));   // 着地予想の欄も更新
+  $("out").textContent = L.join("\n");
+  $("pos").innerHTML = board(rows, D);
+  $("lb").textContent = "人件費 " + Math.round(labor).toLocaleString() + "円";
+}
+
+
+/* ================================================================
+   S7. 着地予想(中間報告)
+   ================================================================ */
+
+// 着地の計算。labor=今の人員での人件費(円)、wage=アルバイト時給
+//   auto = 人件費 ÷ 着地売上予想(%)      cr = 現在の人件費率(入力があればそれ、無ければauto)
+//   tr   = 削減計算用の目標率(%)         diff = 目標を超えている金額(円、マイナス=余裕)
+//   hours= 削減が必要な時間(時給で割って0.1h単位に切り上げ)
+function lfInfo(labor, D, wage) {
+  const T = ST();
+  const lf   = nn(D.lf) || 0;
+  const auto = lf ? labor / lf * 100 : null;
+  const cr   = nn(D.cr) != null ? nn(D.cr) : auto;
+  const tr   = nn(D.tr) != null ? nn(D.tr) : nn(T.tr);
+  const F = { lf, labor, auto, cr, tr };
+  if (lf && cr != null) {
+    F.lab = lf * cr / 100;                                  // 着地の人件費予想(円)
+    if (tr != null) {
+      F.diff  = (cr - tr) / 100 * lf;
+      F.hours = wage > 0 ? Math.ceil(Math.abs(F.diff) / wage * 10) / 10 : null;
+      F.wage  = wage;
+    }
+  }
+  return F;
+}
+
+// ★中間報告の出力文面(形を変えたいときはここ)
+//   清田中間○○万
+//   着地予想○○万
+//   人件費予測○○%
+// 未入力の項目は「○○」のままにする
+function lfReport(F, D) {
+  const T = ST();
+  const man = x => num(+(x / 1e4).toFixed(1)) + "万";
+  const pct = x => num(+x.toFixed(1)) + "%";
+  const L = [
+    T.name + "中間" + (nn(D.ms) ? man(+D.ms) : "○○万"),
+    "着地予想" + (F.lf ? man(F.lf) : "○○万"),
+    "人件費予測" + (F.lf && F.cr != null ? pct(F.cr) : "○○%"),
+  ];
+  $("lfo").textContent = L.join("\n");
+}
+
+// 着地予想の欄(結果の表示と、折りたたみの見出し)を更新する
+function lfRender(F) {
+  lfReport(F, DY()[cur] || {});
+  const box = $("lfr"), yen = x => Math.round(x).toLocaleString() + "円";
+  $("lfn").placeholder = F.auto == null ? "自動" : F.auto.toFixed(1) + "(自動)";
+  if (!F.lf) {
+    box.innerHTML = "<small>着地売上予想を入れると、着地の人件費と必要な削減時間が出ます</small>";
+    $("lfs").textContent = "着地予想（中間報告）";
+    return;
+  }
+  let h = `着地の人件費予想 <b>${yen(F.lab)}</b>(${F.cr.toFixed(1)}%)`;
+  let sm = "着地予想・" + F.cr.toFixed(1) + "%";               // 折りたたみ時の見出し
+  if (F.tr != null) {
+    h += `<br>目標 ${F.tr}% = ${yen(F.lf * F.tr / 100)}`;
+    if (F.diff > 0) {                                          // 目標を超えている → 削減が必要
+      h += `<br><span class="need">あと ${F.hours == null ? "?" : num(F.hours)}H の削減が必要</span>(約${yen(F.diff)}分${F.hours == null ? "。時給が未登録です" : "・時給" + F.wage + "円で計算"})`;
+      sm += " あと" + (F.hours == null ? "?" : num(F.hours)) + "H削減";
+    } else {                                                   // 目標以内
+      h += `<br><span class="okk">目標以内です</span>(あと${yen(-F.diff)}${F.hours == null ? "" : "・約" + num(F.hours) + "H分"}の余裕)`;
+      sm += " 目標以内";
+    }
+  } else {
+    h += "<br><small>目標率を入れると、必要な削減時間が出ます</small>";
+  }
+  box.innerHTML = h;
+  $("lfs").textContent = sm;
+}
+
+
+/* ================================================================
+   S8. 社員の月累計(登録画面に表示)
+   ================================================================ */
+
+// 開いている月の、名前ごとの実働時間(休憩を引く)。tot=月の合計、upto=今日まで
+function monthStats() {
+  const T = ST(), k = Object.keys(T.days || {});
+  if (!k.length) return null;
+  const m = +(T.days[cur] ? cur : k[0]).split("/")[0];
+  const now = new Date(), tm = now.getMonth() + 1, td = now.getDate();
+  const H = {};
+  k.forEach(key => {
+    const [mo, d] = key.split("/").map(Number);
+    if (mo !== m) return;
+    T.days[key].rows.forEach(r => {
+      const w = netHours(r);
+      if (!(w > 0)) return;
+      const o = H[r.n] || (H[r.n] = { tot:0, upto:0 });
+      o.tot += w;
+      if (mo < tm || (mo === tm && d <= td)) o.upto += w;
+    });
+  });
+  return { m, now: m === tm, H };
+}
+
+// 社員1人ぶんの表示文字("10月の累計 157H(今日まで 40H)")
+function mhText(n, M) {
+  if (!M) return "シフトを読み込むと、月の累計時間が出ます";
+  const o = M.H[n] || { tot:0, upto:0 }, f = x => num(+x.toFixed(1)) + "H";
+  return M.m + "月の累計 " + f(o.tot) + (M.now ? "(今日まで " + f(o.upto) + ")" : "");
+}
+
+// 登録画面の社員の累計をすべて更新する
+function refreshMh() {
+  const M = monthStats();
+  document.querySelectorAll("[data-mh]").forEach(e => {
+    const i = +e.dataset.mh, q = ST().emps[i];
+    e.textContent = q && q.n ? mhText(q.n, M) : "";
+  });
+}
+
+
+/* ================================================================
+   S9. 登録画面(店舗・社員・ポジション・共有・OneDrive設定)
+   画面は renderReg() が組み立てる。入力は data-b="パス" で保存データに直接結びつく
+   (例: data-b="pos.0.cwk" → 現在の店舗の pos[0].cwk に保存)
+   ================================================================ */
+
+// 登録画面で使う入力欄1つ分のHTML。b=保存先のパス、v=値、ty=型(n=数字 / s=文字 / 空=そのまま)
+const regInput = (b, v, ty, ex) => `<input data-b="${b}" ${ty ? `data-t="${ty}"` : ""} value="${esc(v)}" ${ex || ""}>`;
+
+// 「店舗」のカード
+function regStoreHTML(T) {
+  return `<h3>店舗</h3><div class="card">
+    <div class="row"><select id="rs" style="flex:1">${S.stores.map(s => `<option value="${s.id}" ${s.id === T.id ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select><button data-a="addst">＋複製して追加</button></div>
+    <div class="row">店舗名 ${regInput("name", T.name, "", "style='flex:1'")}</div>
+    <div class="row">時給 ${regInput("wage", T.wage, "n", "type=number style='width:90px'")}円 毎日の固定人件費 ${regInput("daily", T.daily, "n", "type=number style='width:90px'")}円</div>
+    <div class="row">OneDriveのファイル ${regInput("od", T.od, "", "style='flex:1' placeholder='共有リンク、または /フォルダ/ファイル名.xlsx'")}</div>
+    <div class="row"><button data-a="delst" class="ghost" ${S.stores.length < 2 ? "disabled" : ""}>${armed ? "本当に削除する" : "この店舗を削除"}</button></div></div>`;
+}
+
+// 「社員」のカード(名前・1日の人件費・月の累計)。累計の文字は refreshMh() が入れる
+function regEmpHTML(T) {
+  return `<h3>社員(シフトインした日に発生)</h3><div class="card">
+    <small>累計は、読み込んだ月の全日(前半・後半)の実働時間(休憩を除く)の合計です。削除した人は含みません。</small>` +
+    T.emps.map((e, i) =>
+      `<div class="row">${regInput(`emps.${i}.n`, e.n, "", "style='flex:1' placeholder='名前'")}${regInput(`emps.${i}.v`, e.v, "n", "type=number style='width:90px'")}円<button data-a="delemp" data-i="${i}" class="del">×</button></div>` +
+      `<small class="mh" data-mh="${i}"></small>`).join("") +
+    `<button data-a="addemp">＋社員追加</button></div>`;
+}
+
+// 「ポジション・定数」のカード(1ポジション=1カード)
+function regPosHTML(T) {
+  const parents = T.pos.filter(p => p.role === "parent" && p.n).map(p => p.n);   // 「子」が選べる親の一覧
+  const roles = { normal:"通常", parent:"親(子の人数をまとめる)", child:"子" };
+  return `<h3>ポジション・定数（人数）</h3><small>定数は人数です。範囲は「1-2」のように書きます。空欄=その曜日は使わない、0=人数の目安なし。</small>` +
+    T.pos.map((p, i) => `<div class="card">
+      <div class="row">${regInput(`pos.${i}.n`, p.n, "", "style='flex:1' placeholder='名前'")}<button data-a="up" data-i="${i}" class="ghost">↑</button><button data-a="delpos" data-i="${i}" class="del">×</button></div>
+      <div class="row">定数　平日${regInput(`pos.${i}.cwk`, cnt(p, "wk"), "s", "class=t placeholder=－")}金日祝${regInput(`pos.${i}.cfs`, cnt(p, "fs"), "s", "class=t placeholder=－")}土${regInput(`pos.${i}.csat`, cnt(p, "sat"), "s", "class=t placeholder=－")}</div>
+      <details class="sub" data-di="${i}" ${REGOPEN.has(i) ? "open" : ""}><summary>詳細（種類・略称・判定語）</summary>
+        <div class="row"><select data-b="pos.${i}.role" data-rr="1">${Object.entries(roles).map(([k, l]) => `<option value="${k}" ${(p.role === k || (k === "normal" && (p.role === "reg" || p.role === "free"))) ? "selected" : ""}>${l}</option>`).join("")}</select>
+        ${p.role === "child" ? `<select data-b="pos.${i}.parent"><option value="">親を選ぶ</option>${parents.map(n => `<option ${p.parent === n ? "selected" : ""}>${esc(n)}</option>`).join("")}</select>` : ""}</div>
+        <div class="row">複数担当時の略称 ${regInput(`pos.${i}.ab`, p.ab, "", "style='flex:1' placeholder='空欄=そのまま'")}</div>
+        <div class="row">判定語 ${regInput(`pos.${i}.kw`, p.kw, "", "style='flex:1' placeholder='略称などをカンマ区切りで'")}</div>
+      </details></div>`).join("") +
+    `<button data-a="addpos">＋ポジション追加</button>`;
+}
+
+// 「店舗情報の共有」のカード(リンク/テキストで渡す・受け取る)
+function regShareHTML() {
+  return `<h3>店舗情報の共有</h3><div class="card">
+    <small>この店舗の時給・固定人件費・社員・ポジション・定数を、同じ店舗の人に渡せます(シフトの内容は含みません)。</small>
+    <div class="row"><label><input type="checkbox" id="shod"> OneDriveのファイル場所も含める</label></div>
+    <div class="row"><button data-a="shnative">共有する</button><button data-a="shlink" class="ghost">リンクをコピー</button><button data-a="shtext" class="ghost">テキストをコピー</button></div>
+    <small id="shmsg"></small>
+    <div class="row" style="margin-top:14px"><b>受け取った内容を取り込む</b></div>
+    <textarea id="shin" rows="3" style="width:100%" placeholder="受け取ったリンクまたはテキストを貼り付け"></textarea>
+    <div class="row"><button data-a="shread">読み取る</button></div>
+    <div id="impbox"></div></div>`;
+}
+
+// 「OneDrive連携の詳細」(折りたたみ)
+function regOdHTML() {
+  return `<details><summary>OneDrive連携の詳細</summary>
+    <div class="row">クライアントID <input data-g="cid" value="${esc(S.cid || "")}" style="flex:1" placeholder="空欄でOK（ファイルに設定済み）" autocomplete="off"></div>
+    <div class="row"><label><input type="checkbox" data-g2="auto" ${S.auto === false ? "" : "checked"}> 起動時にOneDriveを自動で読み込む</label></div>
+    <small>登録時に指定するリダイレクトURI: ${redir()}</small>
+    <div class="row"><button data-a="odout" class="ghost">Microsoftからログアウト</button></div></details>`;
+}
+
+// 登録画面を組み立てて表示する
+function renderReg() {
+  const T = ST();
+  $("v3").innerHTML = regStoreHTML(T) + regEmpHTML(T) + regPosHTML(T) + regShareHTML() + regOdHTML();
+  refreshMh(); shRefresh(); renderImp();
+}
+
+
+/* ================================================================
+   S10. 画面のイベント(入力・クリックされた時の処理)
+   ================================================================ */
+
+// ---------- 登録画面 ----------
+
+// 入力(文字を打つたびに保存)。data-b のパスへ書き込む。
+$("v3").oninput = e => {
+  const t = e.target, b = t.dataset.b;
+  if (t.dataset.g) { S[t.dataset.g] = t.value.trim(); save(); return; }   // クライアントIDなど店舗に属さない設定
+  if (!b) return;
+  let v = t.value;
+  if (t.dataset.t === "n") v = +v || 0;                  // 数字
+  if (t.dataset.t === "z") v = v === "" ? null : +v;     // 空欄=null
+  if (t.dataset.t === "s") v = v.trim();                 // 文字(前後の空白を取る)
+  setP(ST(), b, v); save();
+  if (b === "name") fillStores();
+  if (/^emps\.\d+\.n$/.test(b)) refreshMh();             // 社員名を直したら累計も更新
+  shRefresh();                                           // 共有用リンクを作り直す
+};
+
+// 選択・チェックの変更
+$("v3").onchange = e => {
+  if (e.target.dataset.rr) renderReg();                           // 種類(親・子)を変えたら画面を作り直す
+  if (e.target.id === "rs") switchStore(+e.target.value);         // 店舗の切り替え
+  if (e.target.id === "shod") shRefresh();
+  if (e.target.dataset.g2) { S.auto = e.target.checked; save(); } // 起動時の自動読込のオン/オフ
+};
+
+// ボタン(data-a が処理の名前)
+$("v3").onclick = e => {
+  const d = e.target.dataset, a = d.a, T = ST();
+  if (!a) return;
+  if (a !== "delst") armed = false;
+  if (a.indexOf("sh") === 0 || a.indexOf("imp") === 0) { shAct(a); return; }   // 共有まわりは S12 へ
+  if (a === "addst") {                                   // 店舗を複製して追加(シフトの内容は引き継がない)
+    const n = JSON.parse(JSON.stringify(T));
+    n.id = Date.now(); n.name = T.name + "(コピー)"; n.days = {}; n.skill = {}; n.cur = null;
+    S.stores.push(n); switchStore(n.id); return;
+  }
+  if (a === "delst") {                                   // 店舗の削除(2回押しで実行)
+    if (S.stores.length < 2) return;
+    if (!armed) { armed = true; renderReg(); return; }
+    armed = false;
+    S.stores = S.stores.filter(s => s.id !== T.id);
+    switchStore(S.stores[0].id); return;
+  }
+  if (a === "odout") { localStorage.removeItem("od-tok"); renderReg(); return; }   // Microsoftのログアウト(保存した認証を消す)
+  if (a === "addemp") T.emps.push({ n:"", v:0 });
+  if (a === "delemp") T.emps.splice(+d.i, 1);
+  if (a === "addpos") { T.pos.push({ n:"", role:"normal", parent:"", kw:"", ab:"", wk:0, fs:0, sat:0, cwk:"1", cfs:"1", csat:"1" }); REGOPEN.clear(); }
+  if (a === "delpos") { T.pos.splice(+d.i, 1); REGOPEN.clear(); }
+  if (a === "up" && +d.i > 0) { const i = +d.i; [T.pos[i - 1], T.pos[i]] = [T.pos[i], T.pos[i - 1]]; REGOPEN.clear(); }
+  save(); renderReg();
+};
+
+// 詳細(<details>)を開閉したら、開いているカード番号を覚える(画面を作り直しても開いたままにする)
+$("v3").addEventListener("toggle", e => {
+  const i = e.target.dataset && e.target.dataset.di;
+  if (i !== undefined) { if (e.target.open) REGOPEN.add(+i); else REGOPEN.delete(+i); }
+}, true);
+
+// ---------- 下部ナビ(画面の切り替え) ----------
+$("nav").onclick = e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  const n = b.dataset.n;
+  [1, 2, 3, 4].forEach(i => $("v" + i).classList.toggle("on", i == n));
+  [...$("nav").children].forEach(x => x.classList.toggle("on", x === b));
+  $("ttl").textContent = b.lastChild.textContent;        // タイトル帯を画面名にする
+  if (n == 3) renderReg();
+  if (n == 1) draw();
+  window.scrollTo(0, 0);
+};
+
+// ---------- シフト画面: 読み込み・日付・店舗 ----------
+
+// 端末からExcelファイルを選んだ時
+$("f").onchange = async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  if (typeof XLSX === "undefined") { msg("Excel読込ライブラリを取得できていません。ネット接続とブラウザを確認してください"); return; }
+  try { load(await f.arrayBuffer()); } catch (x) { msg("読み込みに失敗しました: " + x.message); }
+};
+$("sh").onchange = () => parse([$("sh").value]);          // シートを手動で選んだ時
+$("st").onchange = e => switchStore(+e.target.value);     // 店舗を切り替えた時
+
+// 日付を変えた時(今の日を並べ直してから切り替える)
+$("d").onchange = e => {
+  const o = DY()[cur];
+  if (o) sortRows(o);
+  setCur(e.target.value); OPEN = null; save(); draw();
+};
+
+// 祝日チェック(定数の種類が変わるので描き直す)
+$("hol").onchange = e => { const D = DY()[cur]; if (!D) return; D.hol = e.target.checked; save(); draw(); };
+
+// ---------- シフト画面: 人の行 ----------
+
+const rowOf = k => { const D = DY()[cur]; return D && D.rows.find(r => r.k === k); };   // キーから人を探す
+
+// 編集欄の入力(名前・時間・休憩・その他)。打つたびに保存して出力を更新。並べ替えはしない
+$("rows").oninput = e => {
+  const t = e.target, f = t.dataset.f;
+  if (!f) return;
+  const r = rowOf(t.dataset.r);
+  if (!r) return;
+  if (f === "bs" || f === "be") {                          // 休憩の開始・終了
+    const b = (r.br || [])[+t.dataset.bi];
+    if (!b) return;
+    b[f === "bs" ? "s" : "e"] = parseFloat(t.value) || 0;
+    const h = t.parentElement.querySelector(".brh");       // 横の「○h」表示も直す
+    if (h) h.textContent = hTxt(Math.max(0, b.e - b.s));
+  } else {
+    r[f] = (f === "s" || f === "e") ? (parseFloat(t.value) || 0) : t.value;
+  }
+  save(); out();
+  const hd = document.querySelector('.pr[data-key="' + r.k + '"] .ph');     // 見出しもその場で直す
+  if (hd) {
+    hd.querySelector(".pn").textContent = r.n || "（名前未入力）";
+    hd.querySelector(".pt").textContent = ptText(r);
+    hd.querySelector(".pp").textContent = posTxt(r);
+  }
+};
+
+// 行の中のボタン(外す・休憩の追加/削除・ポジション・開閉)
+$("rows").onclick = e => {
+  const D = DY()[cur];
+  if (!D) return;
+  const tg = e.target;
+
+  const dl = tg.closest("[data-delr]");                    // 「外す」→ 削除した人へ
+  if (dl) {
+    const k = dl.dataset.delr, i = D.rows.findIndex(r => r.k === k);
+    if (i >= 0) { D.del = D.del || []; D.del.push(...D.rows.splice(i, 1)); if (OPEN === k) OPEN = null; save(); draw(); }
+    return;
+  }
+  const ab = tg.closest("[data-addbr]");                   // 休憩を追加(＋1h / ＋0.5h)
+  if (ab) { const r = rowOf(ab.dataset.addbr); if (r) { addBreak(r, +ab.dataset.len); save(); draw(); } return; }
+  const db = tg.closest("[data-delbr]");                   // 休憩を削除
+  if (db) { const r = rowOf(db.dataset.delbr); if (r && r.br) { r.br.splice(+db.dataset.i, 1); save(); draw(); } return; }
+  const ch = tg.closest("[data-c]");                       // ポジションの選択・解除
+  if (ch) {
+    const r = rowOf(ch.dataset.r);
+    if (r) { ensure(r); const n = ch.dataset.c, i = r.ps.indexOf(n); if (i >= 0) r.ps.splice(i, 1); else r.ps.push(n); save(); draw(); }
+    return;
+  }
+  const tog = tg.closest("[data-tog]");                    // 行の開閉
+  if (tog) toggleRow(tog.dataset.tog);
+};
+
+// 「人を追加」: 17-22 の新しい行を作り、開いて名前欄にカーソルを置く。時間順に並べ直す
+$("add").onclick = () => {
+  const D = DY()[cur];
+  if (!D) return;
+  const r = { n:"", s:17, e:22, ps:[], x:"", br:[] }, k = kid(r);
+  D.rows.push(r); OPEN = k; sortRows(D); save(); draw();
+  const el = document.querySelector('[data-r="' + k + '"][data-f="n"]');
+  if (el) { el.focus(); el.scrollIntoView({ block:"center", behavior:"smooth" }); }
+};
+
+// 削除した人を「戻す」(戻したら時間順に並べ直す)
+$("del").onclick = e => {
+  const b = e.target.closest("[data-res]");
+  if (!b) return;
+  const D = DY()[cur];
+  if (!D) return;
+  D.rows.push(...D.del.splice(+b.dataset.res, 1));
+  sortRows(D); save(); draw();
+};
+
+// この日をExcelを読んだ時点の内容に戻す
+$("rst").onclick = () => {
+  const D = DY()[cur];
+  if (!D || !D.orig) return;
+  const o = JSON.parse(D.orig);
+  D.rows = o.rows; D.tg = o.tg; D.del = []; D.ov = {}; OPEN = null;
+  save(); draw();
+};
+
+// ---------- シフト画面: 予約・売上・備考・着地予想の入力 ----------
+
+// [入力欄のid, 保存先のキー]。数字は数、備考は文字、空欄は ""
+[["g", "g"], ["pp", "pp"], ["tg", "tg"], ["nt", "nt"]].forEach(([i, k]) => {
+  $(i).oninput = e => {
+    const D = DY()[cur];
+    if (!D) return;
+    D[k] = k === "nt" ? e.target.value : (e.target.value === "" ? "" : +e.target.value);
+    save(); out();
+  };
+});
+// 着地予想: ms=中間売上 / lf=着地売上予想 / cr=現在の人件費率 / tr=目標率(店舗にも「前回値」として覚える)
+[["lfm", "ms"], ["lfv", "lf"], ["lfn", "cr"], ["lft", "tr"]].forEach(([i, k]) => {
+  $(i).oninput = e => {
+    const D = DY()[cur];
+    if (!D) return;
+    const v = e.target.value;
+    D[k] = v === "" ? "" : +v;
+    if (k === "tr") ST().tr = D[k];
+    save(); out();
+  };
+});
+
+// ---------- コピーボタン ----------
+// text を取る関数 get を渡して、ボタン b の文字を一時的に「コピーしました」にする
+function copyBtn(b, get) {
+  b.onclick = () => {
+    navigator.clipboard.writeText(get())
+      .then(() => { b.textContent = "コピーしました"; setTimeout(() => b.textContent = "コピー", 1500); })
+      .catch(() => { b.textContent = "コピーできませんでした"; });
+  };
+}
+copyBtn($("cp"),  () => $("out").textContent);    // シフトの出力
+copyBtn($("lfc"), () => $("lfo").textContent);    // 中間報告の出力
+
+
+/* ================================================================
+   S11. OneDriveから読み込む
+   しくみ: Microsoftのログイン(PKCE方式)でトークンを取り、Microsoft Graph APIでファイルを取得する。
+   トークンは localStorage の "od-tok" に保存され、期限が切れたら自動で更新する。
+   ================================================================ */
+
+const OD = { ep: "https://login.microsoftonline.com/consumers/oauth2/v2.0/" };   // 個人用アカウント向けの窓口
+const MS_CLIENT_ID = "9213538a-5ee5-4bba-ab29-691d334b95fe";                     // Azureに登録したアプリのID
+const cid = () => S.cid || MS_CLIENT_ID;                                         // 登録画面で上書きされていればそちらを使う
+
+// 必要な権限。共有リンクの場合は Files.ReadWrite.All、パス指定は Files.Read
+const odSc = loc => (/^https?:/i.test(loc || "") ? "Files.ReadWrite.All" : "Files.Read") + " offline_access";
+
+// ログイン後に戻ってくるURL(Azureに登録したリダイレクトURIと完全に同じにする)
+const redir = () => {
+  let p = location.pathname;
+  if (p.endsWith("/")) p += "shift_app.html";
+  else if (!/\.html?$/.test(p)) p += ".html";
+  return location.origin + p;
+};
+
+// base64url(ログインの暗号まわりの道具)
+const b64u = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const rnd  = n => b64u(crypto.getRandomValues(new Uint8Array(n)));
+
+// Microsoftのログイン画面へ移動する
+async function odLogin(sc) {
+  const v = rnd(48), st = rnd(16);
+  const ch = b64u(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(v)));
+  localStorage.setItem("od-pkce", JSON.stringify({ v, st, sc }));   // 戻ってきた時の照合用
+  localStorage.setItem("od-go", "1");                               // 「ログイン後に読み込む」の目印
+  location.href = OD.ep + "authorize?" + new URLSearchParams({
+    client_id: cid(), response_type: "code", redirect_uri: redir(), response_mode: "query",
+    scope: sc, code_challenge: ch, code_challenge_method: "S256", state: st });
+}
+
+// トークンを取得・更新して保存する
+async function tokenReq(p, sc) {
+  const r = await fetch(OD.ep + "token", {
+    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ client_id: cid(), scope: sc, ...p }) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error_description || j.error);
+  const old = JSON.parse(localStorage.getItem("od-tok") || "{}");
+  localStorage.setItem("od-tok", JSON.stringify({
+    at: j.access_token, rt: j.refresh_token || old.rt, exp: Date.now() + j.expires_in * 1000 - 60000, sc }));
+}
+
+// 使えるトークンを返す(期限内ならそのまま、切れていれば更新)。無ければ null
+async function odToken(sc) {
+  const t = JSON.parse(localStorage.getItem("od-tok") || "null");
+  if (t && t.sc === sc && t.exp > Date.now()) return t.at;
+  if (t && t.rt && t.sc === sc) {
+    try { await tokenReq({ grant_type: "refresh_token", refresh_token: t.rt }, sc); return JSON.parse(localStorage.getItem("od-tok")).at; }
+    catch (e) {}
+  }
+  return null;
+}
+
+// ログイン画面から戻ってきた時の処理(URLに code=... が付いている)。成功したら true
+async function odCallback() {
+  const q = new URLSearchParams(location.search);
+  if (!q.get("code") && !q.get("error")) return false;
+  const sv = JSON.parse(localStorage.getItem("od-pkce") || "{}");
+  history.replaceState(null, "", location.pathname);   // URLから code を消す
+  localStorage.removeItem("od-pkce");
+  if (q.get("error")) { localStorage.removeItem("od-go"); msg("Microsoftのログインに失敗しました: " + (q.get("error_description") || q.get("error"))); return false; }
+  if (q.get("state") !== sv.st) { localStorage.removeItem("od-go"); msg("ログインの確認に失敗しました。もう一度試してください"); return false; }
+  try {
+    await tokenReq({ grant_type: "authorization_code", code: q.get("code"), redirect_uri: redir(), code_verifier: sv.v }, sv.sc);
+    return true;
+  } catch (e) { localStorage.removeItem("od-go"); msg("ログインの処理に失敗しました: " + e.message); return false; }
+}
+
+// ファイルの場所(共有リンク or パス)から、Graph APIのURLを作る
+function odBase(loc) {
+  loc = loc.trim();
+  if (/^https?:/i.test(loc))                              // 共有リンク
+    return "https://graph.microsoft.com/v1.0/shares/u!" +
+      btoa(unescape(encodeURIComponent(loc))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "") + "/driveItem";
+  return "https://graph.microsoft.com/v1.0/me/drive/root:" +   // パス(/フォルダ/ファイル.xlsx)
+    ("/" + loc.replace(/^\/+/, "")).split("/").map(encodeURIComponent).join("/") + ":";
+}
+
+// OneDriveからExcelを取得して読み込む。auto=true は起動時の自動読込(黙って諦められる場面では何も言わない)
+async function odLoad(auto) {
+  const T = ST();
+  if (auto && (!T.od || !cid() || typeof XLSX === "undefined")) return;
+  if (!cid()) { msg("登録情報の「OneDrive連携」に、クライアントIDを入力してください"); return; }
+  if (!T.od) { msg("登録情報の店舗欄に、OneDriveのファイル(共有リンクかパス)を入力してください"); return; }
+
+  const sc = odSc(T.od), tk = await odToken(sc);
+  if (!tk) {
+    if (auto) { msg("OneDriveのログインが切れています。「OneDriveから読み込む」を押してください"); return; }   // 自動の時は勝手に画面遷移しない
+    msg("Microsoftのログイン画面に移動します…");
+    setTimeout(() => odLogin(sc), 400);
+    return;
+  }
+  msg("OneDriveから読み込み中…");
+  const base = odBase(T.od), H = { Authorization: "Bearer " + tk };
+  try {
+    let buf;
+    try {                                                   // まず直接ダウンロード
+      const r = await fetch(base + "/content", { headers: H });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      buf = await r.arrayBuffer();
+    } catch (e1) {                                          // だめなら、ダウンロード用URLを取ってから取得
+      if (String(e1.message).startsWith("HTTP")) throw e1;
+      const r = await fetch(base, { headers: H });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const j = await r.json();
+      const d = await fetch(j["@microsoft.graph.downloadUrl"]);
+      if (!d.ok) throw new Error("HTTP " + d.status);
+      buf = await d.arrayBuffer();
+    }
+    load(buf);
+  } catch (e) {
+    const m = String(e.message);
+    if (m === "HTTP 401") { localStorage.removeItem("od-tok"); msg("ログインの有効期限が切れました。もう一度ボタンを押してください"); }
+    else if (m === "HTTP 404" || m === "HTTP 403") msg("ファイルが見つからない、または開く権限がありません(" + m + ")。ファイルの場所と共有設定を確認してください");
+    else msg("読み込みに失敗しました: " + m);
+  }
+}
+$("od").onclick = () => odLoad();
+
+
+/* ================================================================
+   S12. 店舗情報の共有(リンク/テキストで渡す・受け取る)
+   共有する中身: 店舗名・時給・固定人件費・社員・ポジション(定数)。シフトの内容は含まない。
+   データは JSON → 圧縮 → base64url にして、リンクの # 以降(#share=...)に入れる。
+   ================================================================ */
+
+let SH = null;          // 作成済みの共有データ {url, txt}
+let shT = null;         // 作成を少し遅らせるタイマー
+let IMP = null;         // 受け取って確認待ちの店舗情報
+let armedImp = false;   // 「本当に上書きする」確認中か
+
+const unb64u = s => { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "="; return Uint8Array.from(atob(s), c => c.charCodeAt(0)); };
+
+// 圧縮して文字列にする("1"=圧縮あり、"0"=圧縮なし)
+async function pack(o) {
+  const raw = new TextEncoder().encode(JSON.stringify(o));
+  if (typeof CompressionStream !== "undefined") {
+    const cs = new Blob([raw]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+    return "1" + b64u(await new Response(cs).arrayBuffer());
+  }
+  return "0" + b64u(raw);
+}
+
+// pack の逆
+async function unpack(p) {
+  let bytes;
+  try { bytes = unb64u(p.slice(1)); } catch (e) { throw new Error("データが壊れています(途中で切れた可能性があります)"); }
+  try {
+    if (p[0] === "1") {
+      if (typeof DecompressionStream === "undefined") throw new Error("この端末のブラウザは圧縮形式に対応していません。別のブラウザで開いてください");
+      const ds = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+      return JSON.parse(new TextDecoder().decode(await new Response(ds).arrayBuffer()));
+    }
+    if (p[0] === "0") return JSON.parse(new TextDecoder().decode(bytes));
+  } catch (e) {
+    if (/対応していません/.test(e.message)) throw e;
+    throw new Error("データが壊れています(途中で切れた可能性があります)");
+  }
+  throw new Error("店舗情報の形式ではありません");
+}
+
+// 受け取った内容を安全な形に整える(危険な文字を除き、長さを制限する)
+const cl = (s, n = 60) => String(s == null ? "" : s).replace(/[<>"'&`\\]/g, "").slice(0, n);
+const nu = (x, d = 0) => Number.isFinite(+x) ? +x : d;
+function sane(o) {
+  if (!o || o.t !== "shift-store") throw new Error("店舗情報の形式ではありません");
+  const R = ["normal", "parent", "child", "reg", "free"], zn = x => x == null || x === "" ? null : nu(x);
+  const pos = (Array.isArray(o.pos) ? o.pos : []).slice(0, 60).map(p => ({
+    n: cl(p.n), role: R.includes(p.role) ? p.role : "normal", parent: cl(p.parent), kw: cl(p.kw), ab: cl(p.ab, 10),
+    wk: zn(p.wk), fs: zn(p.fs), sat: zn(p.sat),
+    ...["cwk", "cfs", "csat"].reduce((a, k) => p[k] == null ? a : { ...a, [k]: cl(p[k], 8) }, {}) }));   // 定数(人数)
+  const emps = (Array.isArray(o.emps) ? o.emps : []).slice(0, 100).map(e => ({ n: cl(e.n), v: nu(e.v) }));
+  const skill = {};   // 評価値版との互換のために残している(この版では使わない)
+  Object.keys(o.skill || {}).slice(0, 300).forEach(k => {
+    const d = o.skill[k] || {}, r = {};
+    Object.keys(d).slice(0, 60).forEach(q => { if (Number.isFinite(+d[q])) r[cl(q)] = +d[q]; });
+    skill[cl(k)] = r;
+  });
+  return { name: cl(o.name) || "店舗", wage: nu(o.wage), daily: nu(o.daily), dv: nu(o.dv, 3), emps, pos, skill,
+           od: String(o.od || "").replace(/[<>"'`\\]/g, "").slice(0, 600) };
+}
+
+// 共有する中身(od=true ならOneDriveの場所も含める)
+const shareObj = od => { const T = ST(); return { v:1, t:"shift-store", name:T.name, wage:T.wage, daily:T.daily, emps:T.emps, pos:T.pos, ...(od && T.od ? { od:T.od } : {}) }; };
+
+// 共有リンク・テキストを作り直す(入力のたびに呼ばれるので、少し待ってからまとめて作る)
+function shRefresh() {
+  clearTimeout(shT); SH = null;
+  shT = setTimeout(async () => {
+    try {
+      const p = await pack(shareObj($("shod") && $("shod").checked));
+      SH = { url: location.origin + location.pathname + "#share=" + p, txt: "SHIFTv1." + p };
+    } catch (e) {}
+  }, 150);
+}
+
+// 貼り付けられたリンク/テキストを読み取って、確認待ち(IMP)にする
+async function shRead(text) {
+  text = (text || "").trim();
+  let p;
+  const i = text.indexOf("#share=");
+  if (i >= 0) p = text.slice(i + 7).split(/\s/)[0];
+  else if (text.indexOf("SHIFTv1.") === 0) p = text.slice(8).split(/\s/)[0];
+  else p = text.replace(/\s+/g, "");
+  if (!p) throw new Error("貼り付けた内容が空です");
+  if (p.length > 300000) throw new Error("データが大きすぎます");
+  IMP = sane(await unpack(p)); armedImp = false; renderImp();
+}
+
+// 取り込み確認のカードを表示する
+function renderImp() {
+  const b = $("impbox");
+  if (!b) return;
+  if (!IMP) { b.innerHTML = ""; return; }
+  const I = IMP;
+  b.innerHTML = `<div class="card"><b>${I.name}</b><br><small>時給 ${I.wage}円 / 固定 ${I.daily}円 / 社員 ${I.emps.length}人 / ポジション ${I.pos.length}個${I.od ? " / OneDriveの場所あり" : ""}</small>
+    <div class="row"><button data-a="impover">${armedImp ? "本当に上書きする" : "現在の店舗「" + ST().name + "」に上書き"}</button><button data-a="impnew" class="ghost">新しい店舗として追加</button><button data-a="impno" class="ghost">やめる</button></div></div>`;
+}
+
+// 自動でコピーできない時、入力欄に出して手動コピーしてもらう
+function shFallback(t) { const x = $("shin"); if (x) { x.value = t; x.focus(); x.select(); } }
+
+// クリップボードにコピー(msg=成功時のメッセージ)
+function cpy(t, msg) {
+  const m = $("shmsg");
+  const ok = () => { if (m) m.textContent = msg; };
+  const ng = () => { if (m) m.textContent = "自動でコピーできませんでした。上の入力欄に表示したので、全選択してコピーしてください"; shFallback(t); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok).catch(ng);
+  else ng();
+}
+
+// 共有まわりのボタン処理(登録画面の data-a="sh..." / "imp...")
+function shAct(a) {
+  const m = t => { const e = $("shmsg"); if (e) e.textContent = t; };
+  if (a === "shlink" || a === "shtext" || a === "shnative") {
+    if (!SH) { m("準備中です。少し待ってからもう一度押してください"); shRefresh(); return; }
+    if (a === "shlink") return cpy(SH.url, "リンクをコピーしました。LINEなどに貼り付けて送ってください");
+    if (a === "shtext") return cpy(SH.txt, "テキストをコピーしました。LINEなどに貼り付けて送ってください");
+    if (navigator.share) navigator.share({ title: "店舗情報", text: SH.url }).catch(() => {});
+    else cpy(SH.url, "この端末には共有メニューが無いため、リンクをコピーしました");
+    return;
+  }
+  if (a === "shread") {
+    shRead($("shin").value).then(() => m("読み取りました。内容を確認して、取り込み方を選んでください"))
+      .catch(e => { IMP = null; renderImp(); m("読み取れませんでした: " + e.message); });
+    return;
+  }
+  if (a === "impno") { IMP = null; armedImp = false; renderImp(); return; }
+  if (a === "impnew" && IMP) {                              // 新しい店舗として追加
+    const I = IMP, id = Date.now();
+    S.stores.push({ id, name: I.name, wage: I.wage, daily: I.daily, dv: I.dv, emps: I.emps, pos: I.pos, skill: I.skill, od: I.od, days: {}, cur: null });
+    IMP = null; armedImp = false; switchStore(id);
+    setTimeout(() => m("新しい店舗として追加しました"), 0);
+    return;
+  }
+  if (a === "impover" && IMP) {                             // 今の店舗に上書き(2回押しで実行。シフトの内容は残る)
+    if (!armedImp) { armedImp = true; renderImp(); return; }
+    const T = ST(), I = IMP;
+    Object.assign(T, { wage: I.wage, daily: I.daily, emps: I.emps, pos: I.pos });
+    if (I.od) T.od = I.od;
+    IMP = null; armedImp = false; save(); renderReg();
+    setTimeout(() => m("現在の店舗に取り込みました"), 0);
+  }
+}
+
+// 共有リンク(#share=...)を開いた時の自動取り込み
+async function shBoot() {
+  if (location.hash.indexOf("#share=") !== 0) return;
+  const h = location.hash;
+  history.replaceState(null, "", location.pathname + location.search);   // URLから共有データを消す
+  let err = "";
+  try { await shRead(h); } catch (e) { IMP = null; err = e.message; }
+  document.querySelector('#nav [data-n="3"]').click();                  // 登録画面へ移動
+  setTimeout(() => {
+    const m = $("shmsg");
+    if (m) m.textContent = err ? "リンクの内容を読み取れませんでした: " + err : "受け取った店舗情報を読み取りました。内容を確認して、取り込み方を選んでください";
+    const b = $("impbox");
+    if (b && !err) b.scrollIntoView({ block: "center" });
+  }, 50);
+}
+
+
+/* ================================================================
+   S13. 起動処理(ページを開いた時に最後に1回だけ実行する)
+   ================================================================ */
+
+// 月の選択肢(1〜12月)と、初期値(今日の月、15日までは前半・以降は後半)
+{
+  const now = new Date();
+  const sel = S.sel || { m: now.getMonth() + 1, h: now.getDate() <= 15 ? "前半" : "後半" };
+  $("mm").innerHTML = [...Array(12)].map((_, i) => `<option value="${i + 1}">${i + 1}月</option>`).join("");
+  $("mm").value = sel.m; $("hf").value = sel.h;
+  // 月・前半後半を変えたら、選択を覚えて、読み込み済みのExcelから探し直す
+  $("mm").onchange = $("hf").onchange = () => { S.sel = { m: +$("mm").value, h: $("hf").value }; save(); if (WB) pick(); };
+}
+
+cur = ST().cur;                      // 前回開いていた日
+fillStores(); init(); renderReg();   // 画面を描く
+shBoot();                            // 共有リンクで開かれていれば取り込む
+window.addEventListener("hashchange", shBoot);
+
+// OneDrive: ログインから戻ってきた直後なら読み込む。そうでなければ(自動読込がオンなら)起動時に1回読み込む
+const HADCB = /[?&](code|error)=/.test(location.search);
+odCallback().then(ok => {
+  if (ok && localStorage.getItem("od-go")) { localStorage.removeItem("od-go"); odLoad(); }
+  else if (!HADCB && S.auto !== false) odLoad(true);
+});
+
+// Excel読込ライブラリが取れていない時の案内
+if (typeof XLSX === "undefined") msg("Excel読込ライブラリを取得できていません(ネット接続を確認)");
 </script>
+
+<!-- ================================================================
+     4桁の番号による簡易ロック
+     ・番号は平文では書かず、ハッシュ値 H と比べる(1129 のハッシュ)。
+     ・番号を変えたい時: ブラウザのコンソールで h("shift-gate" + "新しい4桁") を実行し、出た文字列を H に入れる
+       (h 関数はこの中にあるため、コピーして試す)。
+     ・簡易的なもので、本格的なセキュリティではない(ページのコードは誰でも読める)。
+     ・5回間違えると30秒待たされる。ログインは1時間(AUTH_MS)保たれる。
+     ================================================================ -->
 <script>
-(function(){
-const H="nor2qwcos8",SALT="shift-gate",root=document.documentElement;let fails=0,until=0;
-const h=s=>{let a=0xdeadbeef,b=0x41c6ce57;for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);a=Math.imul(a^c,2654435761);b=Math.imul(b^c,1597334677)}a=Math.imul(a^(a>>>16),2246822507)^Math.imul(b^(b>>>13),3266489909);b=Math.imul(b^(b>>>16),2246822507)^Math.imul(a^(a>>>13),3266489909);return (4294967296*(2097151&b)+(a>>>0)).toString(36)};
-const msg=t=>$("pinmsg").textContent=t;
-function lock(){root.classList.add("locked");$("pin").value="";msg("");$("pin").focus()}
-function check(){if(Date.now()<until){msg("30秒ほど待ってから入力してください");return}
-  if(h(SALT+$("pin").value)===H){fails=0;EXP=Date.now()+AUTH_MS;try{localStorage.setItem(AUTH_KEY,String(EXP))}catch(e){}root.classList.remove("locked");$("pin").value="";msg("")}
-  else{fails++;$("pin").value="";if(fails>=5){until=Date.now()+30000;fails=0;msg("5回間違えました。30秒ほど待ってください")}else msg("番号が違います")}}
-$("pinbtn").onclick=check;$("pin").onkeydown=e=>{if(e.key==="Enter")check()};
-const watch=()=>{if(!okSession()&&!root.classList.contains("locked"))lock()};
-setInterval(watch,15000);document.addEventListener("visibilitychange",watch);
-if(root.classList.contains("locked"))$("pin").focus();
+(function () {
+  const H = "nor2qwcos8", SALT = "shift-gate", root = document.documentElement;
+  let fails = 0, until = 0;
+
+  // 文字列 → ハッシュ値(短い文字列)
+  const h = s => {
+    let a = 0xdeadbeef, b = 0x41c6ce57;
+    for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); a = Math.imul(a ^ c, 2654435761); b = Math.imul(b ^ c, 1597334677); }
+    a = Math.imul(a ^ (a >>> 16), 2246822507) ^ Math.imul(b ^ (b >>> 13), 3266489909);
+    b = Math.imul(b ^ (b >>> 16), 2246822507) ^ Math.imul(a ^ (a >>> 13), 3266489909);
+    return (4294967296 * (2097151 & b) + (a >>> 0)).toString(36);
+  };
+  const msg = t => document.getElementById("pinmsg").textContent = t;
+  const $p = () => document.getElementById("pin");
+
+  // 画面をロックする
+  function lock() { root.classList.add("locked"); $p().value = ""; msg(""); $p().focus(); }
+
+  // 入力された番号を確かめる
+  function check() {
+    if (Date.now() < until) { msg("30秒ほど待ってから入力してください"); return; }
+    if (h(SALT + $p().value) === H) {                    // 正しい → 期限を保存してロック解除
+      fails = 0; EXP = Date.now() + AUTH_MS;
+      try { localStorage.setItem(AUTH_KEY, String(EXP)); } catch (e) {}
+      root.classList.remove("locked"); $p().value = ""; msg("");
+    } else {                                             // 違う → 回数を数える
+      fails++; $p().value = "";
+      if (fails >= 5) { until = Date.now() + 30000; fails = 0; msg("5回間違えました。30秒ほど待ってください"); }
+      else msg("番号が違います");
+    }
+  }
+  document.getElementById("pinbtn").onclick = check;
+  $p().onkeydown = e => { if (e.key === "Enter") check(); };
+
+  // 期限が切れたら自動でロックし直す(15秒ごと・画面に戻った時)
+  const watch = () => { if (!okSession() && !root.classList.contains("locked")) lock(); };
+  setInterval(watch, 15000);
+  document.addEventListener("visibilitychange", watch);
+  if (root.classList.contains("locked")) $p().focus();
 })();
 </script>
-<script>if("serviceWorker" in navigator&&location.protocol.indexOf("http")===0)navigator.serviceWorker.register("sw.js").catch(()=>{});</script></body></html>
+
+<!-- ホーム画面アプリ用のサービスワーカー(sw.js)を登録。通信できない環境(file://)では何もしない -->
+<script>if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0) navigator.serviceWorker.register("sw.js").catch(() => {});</script>
+
+</body></html>
